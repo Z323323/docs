@@ -1,19 +1,16 @@
 ---
-title: "Rust Methods and impl Blocks: &self, &mut self, and More"
-sidebarTitle: "Methods"
-description: "Add methods to Rust structs using impl blocks. Covers &self, &mut self, associated functions, and multiple impl blocks for the same struct."
+title: "Methods"
+sidebarTitle: "5.3 - Methods"
 mode: "wide"
 ---
 
-Methods are functions that are defined within the context of a struct (or enum, or trait object) and whose first parameter is always `self`, representing the instance they are called on. Moving behavior inside an `impl` block keeps related data and logic co-located, producing cleaner and more idiomatic Rust code.
+><p><u>Methods are similar to functions: We declare them with the `fn` keyword and a name, they can have parameters and a return value, and they contain some code that’s run when the method is called from somewhere else. Unlike functions, methods are defined within the context of a struct (or an enum or a trait object), and their first parameter is always `self`, which represents the instance of the struct the method is being called on.</u></p>
 
-<Note>This chapter is part of The Rust Book – Almond Version, currently being written. For reference, see the [official Rust Book](https://doc.rust-lang.org/stable/book/).</Note>
+## Method Syntax
 
-## Defining Methods with `impl`
+>Let’s change the area function that has a `Rectangle` instance as a parameter and instead make an `area` method defined on the `Rectangle` struct, as shown in Code 5.3.1.
 
-To add methods to `Rectangle`, open an `impl` (implementation) block:
-
-```rust
+```rust Code 5.3.1
 #[derive(Debug)]
 struct Rectangle {
     width: u32,
@@ -27,46 +24,144 @@ impl Rectangle {
 }
 
 fn main() {
-    let rect = Rectangle { width: 30, height: 50 };
-    println!("Area: {}", rect.area()); // method call syntax
+    let rect1 = Rectangle {
+        width: 30,
+        height: 50,
+    };
+
+    println!(
+        "The area of the rectangle is {} square pixels.",
+        rect1.area()
+    );
 }
 ```
 
-`&self` is shorthand for `self: &Self` — a reference to the current instance. Using `&self` means the method borrows the instance immutably; ownership is not transferred.
+>To define the function within the context of `Rectangle`, we start an `impl` (implementation) block for `Rectangle`. <u>Everything within this `impl` block will be associated with the `Rectangle` type.</u> Then, we move the `area` function within the `impl` curly brackets and change the first (and in this case, only) parameter to be `self` in the signature and everywhere within the body.
 
-### The Three Self Variants
+>In `main`, where we called the `area` function and passed `rect1` as an argument, we can instead use method syntax to call the `area` method on our `Rectangle` instance. The method syntax goes after an instance: We add a `dot` followed by the method name, parentheses, and any arguments.
 
-| Parameter | Meaning | When to use |
-|-----------|---------|-------------|
-| `&self` | Immutable borrow | Most methods — just reading data |
-| `&mut self` | Mutable borrow | Modifying the instance in place |
-| `self` | Takes ownership | Rare; consuming or transforming the instance |
+>In the signature for `area`, we use `&self` instead of `rectangle: &Rectangle`. The `&self` is actually short for `self: &Self`. <u>Within an `impl` block, the type `Self` is an alias for the type that the `impl` block is for. Methods must have a parameter named `self` of type `Self` for their first parameter, so Rust lets you abbreviate this with only the name `self` in the first parameter spot.</u> Note that we still need to use the `&` in front of the self shorthand to indicate that this method borrows the `Self` instance, just as we did in `rectangle: &Rectangle`. Methods can take ownership of `self`, borrow `self` immutably, as we’ve done here, or borrow `self` mutably, just as they can any other parameter.
 
-```rust
+>If we wanted to <u>change</u> the instance that we’ve called the method on as part of what the method does, we’d use `&mut self` as the first parameter.
+
+><p><u>Having a method that takes ownership of the instance by using just self as the first parameter is rare; this technique is usually used when the method transforms self into something else and you want to prevent the caller from using the original instance after the transformation.</u></p>
+
+><u>The main reason for using methods instead of functions</u>, in addition to providing method syntax and not having to repeat the type of self in every method’s signature, <u>is for organization</u>. <u>We’ve put all the things we can do with an instance of a type in one `impl` block rather than making future users of our code search for capabilities of `Rectangle` in various places in the library we provide.</u>
+
+<u>Methods are fundamentally just functions that have been structurally and organizationally enhanced.</u> Understanding this concept is crucial. <u>Code 5.3.2 and Code 5.3.3 below represent the exact same code under the hood</u>; nevertheless, Code 5.3.2 is preferred for the reasons we just discussed. Another vital concept, which the official book also emphasizes, revolves around `&self`. As introduced in Ch. 4 and section 3.2, <u>the primary paradigm for writing idiomatic Rust involves defining your core variables in the `main` function and then modifying them via borrowing across other functions or methods</u>.
+
+<Columns>
+<Column>
+<CodeGroup>
+```rust Code 5.3.2
+#[derive(Debug)]
+struct Strct {
+    n: u8
+}
+
+impl Strct {
+    fn elab(&mut self) {
+        self.n += 2;
+    }
+}
+
+fn main() {
+    let mut strct = Strct { n: 17 };
+    
+    strct.elab();
+    
+    println!("{strct:?}");
+}
+```
+```text E-Output 5.3.2
+   Compiling ch_5_lab v0.1.0 (/var/home/z561/rust_projects/ch_5_lab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running `target/debug/ch_5_lab`
+Strct { n: 19 }
+```
+</CodeGroup>
+</Column>
+<Column>
+<CodeGroup>
+```rust Code 5.3.3
+#[derive(Debug)]
+struct Strct {
+    n: u8
+}
+
+fn main() {
+    let mut strct = Strct { n: 17 };
+    
+    elab(&mut strct);
+    
+    println!("{strct:?}");
+}
+
+fn elab(strct: &mut Strct) {
+    strct.n += 2;
+}
+```
+```text E-Output 5.3.3
+   Compiling ch_5_lab v0.1.0 (/var/home/z561/rust_projects/ch_5_lab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running `target/debug/ch_5_lab`
+Strct { n: 19 }
+```
+</CodeGroup>
+</Column>
+</Columns>
+
+
+>Note that <u>we can choose to give a method the same name as one of the struct’s fields</u>. For example, we can define a method on `Rectangle` that is also named `width`:
+
+```rust Code 5.3.4
+// --snip--
+
 impl Rectangle {
-    // Immutable: just reads
-    fn area(&self) -> u32 {
-        self.width * self.height
+    fn width(&self) -> bool {
+        self.width > 0
     }
+}
 
-    // Mutable: changes the instance
-    fn scale(&mut self, factor: u32) {
-        self.width *= factor;
-        self.height *= factor;
-    }
+fn main() {
+    let rect1 = Rectangle {
+        width: 30,
+        height: 50,
+    };
 
-    // Consuming: transforms into a new type
-    fn into_dimensions(self) -> (u32, u32) {
-        (self.width, self.height)
+    if rect1.width() {
+        println!("The rectangle has a nonzero width; it is {}", rect1.width);
     }
 }
 ```
 
-## Methods with Additional Parameters
+>Here, we’re choosing to make the `width` method return `true` if the value in the instance’s `width` field is greater than `0` and `false` if the value is `0`: We can use a field within a method of the same name for any purpose. <u>In `main`, when we follow `rect1.width` with parentheses, Rust knows we mean the method `width`. When we don’t use parentheses, Rust knows we mean the field `width`.</u>
 
-Methods can take additional parameters beyond `self`. Here `can_hold` checks whether one rectangle fits inside another:
+><p><u>Often, but not always, when we give a method the same name as a field we want it to only return the value in the field and do nothing else. Methods like this are called **getters**, and Rust does not implement them automatically for struct fields as some other languages do. Getters are useful because you can make the field private but the method public and thus enable read-only access to that field as part of the type’s public API.</u></p>
 
-```rust
+<Info>
+## Where’s the -> Operator?
+
+>In C and C++, two different operators are used for calling methods: You use `.` if you’re calling a method on the object directly and `->` if you’re calling the method on a pointer to the object and need to dereference the pointer first. In other words, if `object` is a pointer, `object->something()` is similar to `(*object).something()`.
+
+>Rust doesn’t have an equivalent to the `->` operator; instead, Rust has a feature called **automatic referencing and dereferencing**. Calling methods is one of the few places in Rust with this behavior.
+
+>Here’s how it works: <u>When you call a method with `object.something()`, Rust automatically adds in `&`, `&mut`, or `*` so that object matches the signature of the method.</u> In other words, the following are the same:
+
+>- `p1.distance(&p2);`
+>- `(&p1).distance(&p2);`
+
+>The first one looks much cleaner. This automatic referencing behavior works because methods have a clear receiver—the type of `self`. Given the receiver and name of a method, Rust can figure out definitively whether the method is reading (`&self`), mutating (`&mut self`), or consuming (`self`). The fact that Rust makes borrowing implicit for method receivers is a big part of making ownership ergonomic in practice.
+</Info>
+
+## Methods with More Parameters
+
+>Let’s practice using methods by implementing a second method on the `Rectangle` struct. This time we want an instance of `Rectangle` to take another instance of `Rectangle` and return `true` if the second `Rectangle` can fit completely within `self` (the first `Rectangle`); otherwise, it should return `false`.
+
+<CodeGroup>
+```rust Code 5.3.5
+// --snip--
+
 impl Rectangle {
     fn area(&self) -> u32 {
         self.width * self.height
@@ -78,145 +173,178 @@ impl Rectangle {
 }
 
 fn main() {
-    let large  = Rectangle { width: 100, height: 80 };
-    let medium = Rectangle { width: 50,  height: 40 };
-    let small  = Rectangle { width: 10,  height: 20 };
+    let rect1 = Rectangle {
+        width: 30,
+        height: 50,
+    };
+    let rect2 = Rectangle {
+        width: 10,
+        height: 40,
+    };
+    let rect3 = Rectangle {
+        width: 60,
+        height: 45,
+    };
 
-    println!("large can hold medium: {}", large.can_hold(&medium)); // true
-    println!("medium can hold large: {}", medium.can_hold(&large)); // false
-    println!("large can hold small:  {}", large.can_hold(&small));  // true
+    println!("Can rect1 hold rect2? {}", rect1.can_hold(&rect2));
+    println!("Can rect1 hold rect3? {}", rect1.can_hold(&rect3));
 }
 ```
+```text E-Output 5.3.5
+Can rect1 hold rect2? true
+Can rect1 hold rect3? false
+```
+</CodeGroup>
 
-## Associated Functions (Static Methods)
+>We can tell what the type of the parameter of `can_hold` will be by looking at the code that calls the method: `rect1.can_hold(&rect2)` passes in `&rect2`, which is an immutable borrow to `rect2`, an instance of `Rectangle`. This makes sense because we only need to read `rect2` (rather than write, which would mean we’d need a mutable borrow), and <u>we want main to retain ownership of `rect2` so that we can use it again after calling the `can_hold` method</u>.
 
-Functions inside an `impl` block that do **not** take `self` are called *associated functions*. They are called with `::` syntax on the type rather than `.` syntax on an instance. The most common use is constructors:
+>Methods can take multiple parameters that we add to the signature <u>after</u> the `self` parameter, and those parameters work just like parameters in functions.
 
-```rust
+## Associated Functions
+
+><p><u>All functions defined within an `impl` block are called associated functions because they’re associated with the type named after the `impl`. We can define associated functions that don’t have `self` as their first parameter (and thus are not methods) because they don’t need an instance of the type to work with. We’ve already used one function like this: the `String::from` function that’s defined on the `String` type.</u></p>
+
+><u>Associated functions that aren’t methods are often used for **constructors** that will return a new instance of the struct. These are often called `new`, but `new` isn’t a special name and isn’t built into the language.</u> For example, we could choose to provide an associated function named `square` that would have one dimension parameter and use that as both width and height, thus making it easier to create a square `Rectangle` rather than having to specify the same value twice:
+
+```rust Code 5.3.6
 impl Rectangle {
-    // Associated function — acts like a constructor
-    fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
-    }
-
-    // Another common pattern: square convenience constructor
     fn square(size: u32) -> Self {
-        Self { width: size, height: size }
+        Self {
+            width: size,
+            height: size,
+        }
     }
-
-    fn area(&self) -> u32 {
-        self.width * self.height
-    }
-}
-
-fn main() {
-    let rect   = Rectangle::new(30, 50);
-    let sq     = Rectangle::square(25);
-
-    println!("Rect area: {}", rect.area()); // 1500
-    println!("Square area: {}", sq.area()); // 625
 }
 ```
 
-`Self` inside the `impl` block is an alias for the type being implemented (`Rectangle` here). Prefer `Self` over repeating the type name to make refactoring easier.
+><u>The `Self` keywords in the return type and in the body of the function are aliases for the type that appears after the `impl` keyword</u>, which in this case is `Rectangle`.
+
+><u>To call this associated function, we use the `::` syntax with the struct name; `let sq = Rectangle::square(3)` is an example. This function is namespaced by the struct: The `::` syntax is used for both associated functions and namespaces created by modules.</u> We’ll discuss modules in Ch. 7.
+
+## Getters & Setters
+
+The official book does not investigate beyond getter methods, but this book will. We will explore **setters** as well.
+
+First of all, it is important to clarify the standard, idiomatic naming conventions for these methods in Rust. According to the official Rust API Guidelines, getter methods should <u>not</u> use the `get_` prefix. Instead, a getter should simply share the exact name of the field it accesses (for example, a getter for a `width` field is simply named `width()`). <u>For setters, however, the standard practice is to use the `set_` prefix (for example, `set_width()`). This convention keeps the API clean, concise, and immediately familiar to other Rust developers.</u>
+
+Another fundamental topic not analyzed by the official book is the primary motivation for defining getter and setter methods in the first place, since, at first glance, they might rightfully appear completely useless. To understand their purpose, we must first observe a fundamental rule regarding visibility: <u>in Rust, structs and their fields are **private** by default</u>.
+
+<p><u>When a struct is private (the `pub` keyword is omitted), it can only be accessed and instantiated from within the module where it is defined, or from its child submodules. If you want a struct to be accessible from outside its defining module, you must explicitly mark it with the `pub` (public) keyword. However, even if a struct is public, its fields remain strictly private by default. To access or modify those fields directly from another module, each specific field must also be individually marked as `pub`. This strict privacy boundary is exactly why getters and setters are so valuable: they allow you to keep the struct's internal fields private (preventing unauthorized or invalid modifications) while providing controlled, public methods to read or update that data safely.</u></p>
+
+All of this reasoning becomes crucial in a professional context where your code is published as a dependency for others to use (typically because it handles a complex task efficiently). In these scenarios, any internal fields within your module that should not be exposed externally are simply declared as we have done so far—by omitting the `pub` keyword. For these private fields, no getter or setter methods need to be exposed.
+
+<p><u>For fields that do need to interact with external code, you can keep the fields private and expose them through getter methods (for read access) and/or setter methods (for write access).</u></p>
+
+It is also worth pointing out that <u>such code structuring improves security</u>. <u>If a sensitive field cannot be directly accessed by an external module written by a developer implementing your code (who doesn't modify your source code), it cannot be accidentally tampered with!</u> In this scenario, a developer implementing our code can always modify the source code if they choose to. However, <u>it is up to us to discourage them</u>, providing a working, secure module so that another programmer doesn't have to worry about internal details and can implement it 'on the fly'. Getter and setter methods are clear indicators of well-written code!
+
+Just like structs and fields, <u>any method you define inside an `impl` block is strictly private to its module unless you explicitly mark it with the `pub` keyword (e.g., `pub fn width(&self)`)</u>.
+
+<u>The true power of encapsulation in Rust is achieved by combining different visibility levels.</u> Here is the standard architectural pattern:
+
+- **The Struct**: <u>Marked as `pub` so it can be instantiated by external modules.</u>
+- **The Fields**: <u>Left completely private (no `pub` keyword) so external code cannot touch the raw data.</u>
+- **The Methods (Getters/Setters)**: <u>Marked as `pub` so external code can call them.</u>
+
+By doing this, we create a secure gateway. An external developer can call your `pub fn set_width()` method, but they cannot write `my_struct.width = 500` directly. <u>Because the setter is just a function, you can even write internal logic inside it to validate the input (e.g., panicking or returning an error if someone tries to set a negative width) before actually modifying the private field.</u> This guarantees that your struct's internal state remains perfectly valid at all times.
+
+<u>The level of accessibility in this architecture is literally dictated by the presence or absence of getter and setter methods!</u> Since all fields are private, these methods represent the sole gateway to access them; there is absolutely no other way around it.
+
+At this point, one final doubt remains to be clarified—a question that should have already crossed your mind if you are a careful and critical reader:
+
+- <span style={{ color: "#964B00" }}><b>Q1</b>: If we can only write to fields using setter methods, how do we create an instance of the struct in the first place?</span>
+- <span style={{ color: "#008080" }}><b>A1</b>: Even if setter methods existed for every single field (which is highly unlikely), we would still need to create the instance first, because methods can only be called on a pre-existing instance. <u>The solution to this paradox is the associated function called constructor.</u> Through a constructor (explicitly declared as `pub`), we have the ability to initialize all the private fields from the inside and return a fresh instance. Once the struct is instantiated, any further operations on its individual fields will strictly require the use of getters and setters.</span>
+
+Now that all the puzzle pieces are in place, we can finally examine Code 5.3.7!
+
+<CodeGroup>
+```rust Code 5.3.7
+#[derive(Debug)]
+pub struct Strct {
+    r#_priv: u8, // r# is a raw identifier ('priv' is a reserved keyword).
+    r_only: u8,
+    w_only: u8,
+    r_and_w: u8
+}
+
+impl Strct {
+    pub fn new(r#_priv: u8, r_only: u8, w_only: u8, r_and_w: u8) -> Self {
+        Strct {
+            r#_priv,
+            r_only,
+            w_only,
+            r_and_w
+        }
+    }
+
+    pub fn r_only(&self) -> u8 {
+        self.r_only
+    }
+    
+    pub fn set_w_only(&mut self, val: u8) {
+        self.w_only = val;
+    }
+    
+    pub fn r_and_w(&self) -> u8 {
+        self.r_and_w
+    }
+    
+    pub fn set_r_and_w(&mut self, val: u8) {
+        self.r_and_w = val;
+    }
+}
+// Imagine this is an external main function!
+fn main() {
+    let mut strct = Strct::new(1, 2, 3, 4);
+    println!("{strct:?}");
+    
+    let r_only = strct.r_only();
+    println!("r_only: {r_only}");
+    
+    strct.set_w_only(17);
+    println!("{strct:?}");
+    
+    let r_and_w = strct.r_and_w();
+    println!("r_and_w: {r_and_w}");
+    
+    strct.set_r_and_w(27);
+    println!("{strct:?}");
+}
+```
+```text E-Output 5.3.7
+   Compiling ch_5_lab v0.1.0 (/var/home/z561/rust_projects/ch_5_lab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running `target/debug/ch_5_lab`
+Strct { _priv: 1, r_only: 2, w_only: 3, r_and_w: 4 }
+r_only: 2
+Strct { _priv: 1, r_only: 2, w_only: 17, r_and_w: 4 }
+r_and_w: 4
+Strct { _priv: 1, r_only: 2, w_only: 17, r_and_w: 27 }
+```
+</CodeGroup>
+
+Since `r_and_w` requires both read and write access, we could technically just declare it as `pub r_and_w: u8` inside `Strct`. Doing so, however, would break the encapsulation pattern established for the other fields. Keeping `r_and_w` private while providing a getter and a setter makes the overall architecture much cleaner and more consistent.
+
+This brings us to a final question:
+
+- <span style={{ color: "#964B00" }}><b>Q2</b>: Under what circumstances is it truly appropriate to make struct fields public with `pub`?</span>
+- <span style={{ color: "#008080" }}><b>A2</b>: If your struct is just a 'dumb' bag of data where any value is valid (for example, struct `Point { pub x: f64, pub y: f64 }`), idiomatic Rust actually prefers making the fields `pub`. Rust developers generally dislike writing getters and setters if there is no underlying logic to protect.</span>
 
 ## Multiple `impl` Blocks
 
-A type can have more than one `impl` block. While usually one block is fine, multiple blocks become useful with generics and traits (covered in later chapters):
+>Each struct is allowed to have multiple `impl` blocks.
 
-```rust
+```rust Code 5.3.8
 impl Rectangle {
-    fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
-    }
-
     fn area(&self) -> u32 {
         self.width * self.height
     }
 }
 
 impl Rectangle {
-    fn perimeter(&self) -> u32 {
-        2 * (self.width + self.height)
-    }
-
-    fn is_square(&self) -> bool {
-        self.width == self.height
-    }
-}
-
-fn main() {
-    let r = Rectangle::new(20, 20);
-    println!("Area:      {}", r.area());       // 400
-    println!("Perimeter: {}", r.perimeter());  // 80
-    println!("Is square: {}", r.is_square());  // true
-}
-```
-
-## Automatic Referencing and Dereferencing
-
-When you call a method with dot syntax, Rust automatically adds `&`, `&mut`, or `*` so that the object matches the method signature. This means you rarely need to write `(&rect).area()` — Rust figures it out:
-
-```rust
-rect.area();           // Rust reads this as (&rect).area()
-rect.scale(2);         // Rust reads this as (&mut rect).scale(2)
-```
-
-This *automatic referencing* behavior is why method syntax feels ergonomic — no explicit dereferencing is needed.
-
-## Putting It All Together
-
-```rust
-#[derive(Debug)]
-struct Rectangle {
-    width: u32,
-    height: u32,
-}
-
-impl Rectangle {
-    fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
-    }
-
-    fn square(size: u32) -> Self {
-        Self { width: size, height: size }
-    }
-
-    fn area(&self) -> u32 {
-        self.width * self.height
-    }
-
-    fn perimeter(&self) -> u32 {
-        2 * (self.width + self.height)
-    }
-
     fn can_hold(&self, other: &Rectangle) -> bool {
         self.width > other.width && self.height > other.height
     }
-
-    fn scale(&mut self, factor: u32) {
-        self.width  *= factor;
-        self.height *= factor;
-    }
-}
-
-fn main() {
-    let mut r1 = Rectangle::new(30, 50);
-    let r2 = Rectangle::square(20);
-
-    println!("{:#?}", r1);
-    println!("Area: {}, Perimeter: {}", r1.area(), r1.perimeter());
-    println!("r1 can hold r2: {}", r1.can_hold(&r2));
-
-    r1.scale(2);
-    println!("After scaling: {:?}", r1);
 }
 ```
 
-## Summary
-
-- `impl TypeName { }` defines methods and associated functions for a type.
-- `&self` borrows immutably; `&mut self` borrows mutably; `self` consumes.
-- Associated functions (no `self`) are called with `::` — commonly used as constructors (`Type::new(...)`).
-- Multiple `impl` blocks are valid; useful when combined with generics and traits.
-- Rust handles automatic referencing so dot-call syntax is ergonomic.
+>There’s no reason to separate these methods into multiple `impl` blocks here, but this is valid syntax. We’ll see a case in which multiple `impl` blocks are useful in Ch. 10, where we discuss generic types and traits.

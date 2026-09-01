@@ -1,147 +1,385 @@
 ---
-title: "Defining Rust Structs: Fields, Shorthand, and Update Syntax"
-sidebarTitle: "Structs"
-description: "Learn how to define structs in Rust, instantiate them, use field shorthand, and create struct update syntax for new instances from existing ones."
+title: "Defining and Instantiating Structs"
+sidebarTitle: "5.1 - Defining and Instantiating Structs"
 mode: "wide"
 ---
 
-Structs are Rust's primary tool for grouping related data under a single named type. Like records or classes in other languages, a struct lets you name and package together multiple values that form a meaningful whole — and unlike a tuple, each field has an explicit name that makes the code self-documenting.
+>A **struct**, or structure, is a custom data type that lets you package together and name multiple related values that make up a <u>meaningful group</u>.
 
-<Note>This chapter is part of The Rust Book – Almond Version, currently being written. For reference, see the [official Rust Book](https://doc.rust-lang.org/stable/book/).</Note>
+>Structs are similar to tuples, in that both hold multiple related values. Like tuples, the pieces of a struct can be different types. Unlike with tuples, <u>in a struct you’ll name each piece of data so it’s clear what the values mean</u>.
 
-## Defining a Struct
+>To define a struct, we enter the keyword `struct` and name the entire struct. A struct’s name should describe the significance of the pieces of data being grouped together. Then, inside curly brackets, we define the names and types of the pieces of data, which we call <u>fields</u>.
 
-Use the `struct` keyword followed by a name and a block of *fields*, each with a name and a type:
+>For example, Code 5.1.1 shows a struct that stores information about a user account.
 
-```rust
+```rust Code 5.1.1
 struct User {
+    active: bool,
     username: String,
     email: String,
-    sign_in_count: u64,
-    active: bool,
+    sign_in_count: u64,   
 }
 ```
 
-By convention, struct names use `UpperCamelCase`.
+><u>To use a struct after we’ve defined it, we create an instance of that struct by specifying concrete values for each of the fields.</u> We create an instance by stating the name of the struct and then add curly brackets containing `key: value` pairs, where the keys are the names of the fields and the values are the data we want to store in those fields.
 
-## Instantiating a Struct
-
-Create an instance by naming the struct and providing values for every field:
-
-```rust
+```rust Code 5.1.2
 fn main() {
     let user1 = User {
-        email: String::from("alice@example.com"),
-        username: String::from("alice"),
         active: true,
+        username: String::from("someusername123"),
+        email: String::from("someone@example.com"),
         sign_in_count: 1,
     };
-
-    println!("User: {} ({})", user1.username, user1.email);
 }
 ```
 
-Access fields with dot notation: `user1.email`. To mutate fields, the *entire* binding must be `mut`:
+>To get a specific value from a struct, we use dot notation. For example, to access this user’s email address, we use `user1.email`. <u>If the instance is mutable, we can change a value by using the dot notation and assigning into a particular field.</u> Code 5.1.3 shows how to change the value in the `email` field of a mutable `User` instance.
 
-```rust
-let mut user1 = User { /* ... */ };
-user1.email = String::from("newemail@example.com");
+```rust Code 5.1.3
+fn main() {
+    let mut user1 = User {
+        // --snip--
+    };
+
+    user1.email = String::from("anotheremail@example.com");
+}
 ```
 
-Rust does not allow marking individual fields as mutable — mutability is a property of the binding.
+><p><u>Note that the entire instance must be mutable; Rust doesn’t allow us to mark only certain fields as mutable. As with any expression, we can construct a new instance of the struct as the last expression in the function body to implicitly return that new instance.</u></p>
 
-## Field Init Shorthand
+>Code 5.1.4 shows a `build_user` function that returns a `User` instance with the given email and username.
 
-When a variable name matches a field name exactly, you can use *field init shorthand* to avoid repetition:
-
-```rust
+```rust Code 5.1.4
 fn build_user(email: String, username: String) -> User {
     User {
-        email,        // shorthand for email: email
-        username,     // shorthand for username: username
         active: true,
+        username: username,
+        email: email,
         sign_in_count: 1,
     }
 }
 ```
 
-## Struct Update Syntax
+>It makes sense to name the function parameters with the same name as the struct fields, but having to repeat the `email` and `username` field names and variables is a bit tedious. If the struct had more fields, repeating each name would get even more annoying. Luckily, there’s a convenient shorthand!
 
-To create a new instance that inherits most fields from an existing one, use the `..` *struct update syntax*:
+## Using the Field Init Shorthand
 
-```rust
-fn main() {
-    let user1 = build_user(
-        String::from("alice@example.com"),
-        String::from("alice"),
-    );
+>In Code 5.1.5, using the field init shorthand syntax, <u>we set the `email` field’s value to the value in the `email` parameter of the `build_user` function</u>. <u>Because the `email` field and the `email` parameter have the same name, we only need to write `email` rather than `email: email`.</u>
 
-    let user2 = User {
-        email: String::from("bob@example.com"),
-        ..user1 // fill remaining fields from user1
-    };
-
-    println!("{}", user2.username); // "alice" — copied from user1
+```rust Code 5.1.5
+fn build_user(email: String) -> User {
+    User {
+        // --snip--
+        email,
+    }
 }
 ```
 
-Note that `..user1` must come last. Also, because `username` is a `String` (not `Copy`), the `..user1` syntax *moves* it into `user2`, so `user1.username` is no longer valid after this point (though `user1.email` and the scalar fields are fine).
+## Creating Instances with Struct Update Syntax
 
-## Tuple Structs
+>It’s often useful to create a new instance of a struct that includes most of the values from another instance of the same type, but changes some of them. You can do this using struct update syntax.
 
-*Tuple structs* have fields without names — useful when you want the type distinction of a struct but don't need field names:
+>The syntax `..` specifies that <u>the remaining fields not explicitly set should have the same value as the fields in the given instance</u>.
 
-```rust
+```rust Code 5.1.6
+fn main() {
+    // --snip--
+
+    let user2 = User {
+        email: String::from("another@example.com"),
+        ..user1
+    };
+}
+```
+
+>Code 5.1.6 creates an instance in `user2` that has a different value for `email` but has the same values for the `username`, `active`, and `sign_in_count` fields from `user1`. <u>The `..user1` must come last to specify that any remaining fields should get their values from the corresponding fields in `user1`</u>, but we can choose to specify values for as many fields as we want in any order, regardless of the order of the fields in the struct’s definition.
+
+><p><u>In Code 5.1.6, we can no longer use `user1` after creating `user2` because the `String` in the `username` field of `user1` was moved into `user2`. If we had given `user2` new `String` values for both `email` and `username`, and thus only used the `active` and `sign_in_count` values from `user1`, then `user1` would still be valid after creating `user2`. This happens because both `active` and `sign_in_count` are types that implement the `Copy` trait. We can also still use `user1.email` in this example, because its value was not moved out of `user1`.</u></p>
+
+Thanks to the comprehensive analysis conducted in Ch. 4, it is easy to imagine how a struct's field values are laid out on the stack; therefore, a detailed memory analysis will not be necessary in this case.
+
+## Tuples vs Structs
+
+As mentioned in the official book, tuples are somewhat similar to structs. In this section, we want to emphasize that <u>tuples and structs represent exactly the same thing at the raw data level</u>. The only difference between the two is that a struct's fields are assigned custom labels, allowing you to write clearer, more structured—and therefore more powerful—code using built-in language features (such as the `..` operator we just observed). In particular, Code 5.1.7, C-Output 5.1.7, Code 5.1.8, and C-Output 5.1.8 demonstrate that <u>tuples and structs behave completely identically with respect to the ownership mechanism</u>.
+
+<Columns>
+<Column>
+<CodeGroup>
+```rust Code 5.1.7
+fn main() {
+    let tup1 = (7_u8, 'h', String::from("hello"));
+    
+    let _tup2 = (17_u8, 'e', tup1.2);
+    
+    println!("{:?}", tup1);
+}
+```
+```text C-Output 5.1.7
+   Compiling ch_5_lab v0.1.0 (/var/home/z561/rust_projects/ch_5_lab)
+error[E0382]: borrow of partially moved value: `tup1`
+ --> src/main.rs:7:22
+  |
+5 |     let _tup2 = (17_u8, 'e', tup1.2);
+  |                              ------ value partially moved here
+6 |     
+7 |     println!("{:?}", tup1);
+  |                      ^^^^ value borrowed here after partial move
+  |
+  = note: partial move occurs because `tup1.2` has type `String`, which does not implement the `Copy` trait
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `ch_5_lab` (bin "ch_5_lab") due to 1 previous error
+```
+</CodeGroup>
+</Column>
+<Column>
+<CodeGroup>
+```rust Code 5.1.8
+#[derive(Debug)]
+struct Strct {
+    a: u8,
+    b: char,
+    c: String
+}
+
+fn main() {
+    let strct1 = Strct {
+        a: 7,
+        b: 'h',
+        c: String::from("hello")
+    };
+    
+    let _strct2 = Strct {
+        a: 17,
+        b: 'e',
+        c: strct1.c
+    };
+    
+    println!("{:?}", strct1);
+}
+```
+```text C-Output 5.1.8
+   Compiling ch_5_lab v0.1.0 (/var/home/z561/rust_projects/ch_5_lab)
+error[E0382]: borrow of partially moved value: `strct1`
+  --> src/main.rs:32:22
+   |
+29 |         c: strct1.c
+   |            -------- value partially moved here
+...
+32 |     println!("{:?}", strct1);
+   |                      ^^^^^^ value borrowed here after partial move
+   |
+   = note: partial move occurs because `strct1.c` has type `String`, which does not implement the `Copy` trait
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `ch_5_lab` (bin "ch_5_lab") due to 1 previous error
+```
+</CodeGroup>
+</Column>
+</Columns>
+
+At this point, we can also directly observe the mechanics of the `..` operator in Code 5.1.9. Since tuples cannot utilize the `..` operator, an equivalent piece of code was written to demonstrate its behavior under the hood. This proves that, once again, tuples and structs behave identically: even though the fields `tup1.1` and `tup1.2` are moved into `tup2`, the field `tup1.0` remains perfectly valid and accessible, despite the `tup1` variable as a whole becoming unusable!
+
+As for Code 5.1.10, the reasoning is exactly the same, mirroring this behavior for structs using the struct update syntax (`..`).
+
+<Columns>
+<Column>
+<CodeGroup>
+```rust Code 5.1.9
+fn main() {
+    let tup1 = (7_u8, 'h', String::from("hello"));
+    
+    let _tup2 = (17_u8, tup1.1, tup1.2);
+    
+    println!("{}", tup1.0);
+}
+```
+```text C-Output 5.1.9
+   Compiling ch_5_lab v0.1.0 (/var/home/z561/rust_projects/ch_5_lab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running `target/debug/ch_5_lab`
+7
+```
+</CodeGroup>
+</Column>
+<Column>
+<CodeGroup>
+```rust Code 5.1.10
+struct Strct {
+    a: u8,
+    _b: char,
+    _c: String
+}
+
+fn main() {
+    let strct1 = Strct {
+        a: 7,
+        _b: 'h',
+        _c: String::from("hello")
+    };
+    
+    let _strct2 = Strct {
+        a: 17,
+        ..strct1
+    };
+    
+    println!("{}", strct1.a);
+}
+```
+```text C-Output 5.1.10
+   Compiling ch_5_lab v0.1.0 (/var/home/z561/rust_projects/ch_5_lab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running `target/debug/ch_5_lab`
+7
+```
+</CodeGroup>
+</Column>
+</Columns>
+
+## Creating Different Types with Tuple Structs
+
+>Rust also supports structs that look similar to tuples, called **tuple structs**. <u>Tuple structs have the added meaning the struct name provides but don’t have names associated with their fields; rather, they just have the types of the fields. Tuple structs are useful when you want to give the whole tuple a name and make the tuple a different type from other tuples, and when naming each field as in a regular struct would be verbose or redundant.</u>
+
+>To define a tuple struct, start with the `struct` keyword and the struct name followed by the types in the tuple. For example, Code 5.1.1 defines and uses two tuple structs named `Color` and `Point`:
+
+```rust Code 5.1.11
 struct Color(i32, i32, i32);
 struct Point(i32, i32, i32);
 
 fn main() {
     let black = Color(0, 0, 0);
     let origin = Point(0, 0, 0);
-
-    // Color and Point are distinct types even though their fields are identical
-    println!("Red channel: {}", black.0);
 }
 ```
 
-Access fields by index (`.0`, `.1`, `.2`).
+>Note that the <u>`black` and `origin` values are different types</u> because they’re instances of different tuple structs. <u>Each struct you define is its own type</u>, even though the fields within the struct might have the same types. For example, a function that takes a parameter of type `Color` cannot take a `Point` as an argument, even though both types are made up of three `i32` values. Otherwise, <u>tuple struct instances are similar to tuples in that you can destructure them into their individual pieces, and you can use a `.` followed by the index to access an individual value</u>. Unlike tuples, <u>tuple structs require you to name the type of the struct when you destructure them</u>. For example, we would write `let Point(x, y, z) = origin` to destructure the values in the `origin` point into variables named `x`, `y`, and `z`.
 
-## Unit-Like Structs
+## Defining Unit-Like Structs
 
-A *unit-like struct* has no fields at all. This sounds odd, but it is useful for implementing traits on a type when you don't need to store any data:
+>You can also define structs that don’t have any fields! These are called **unit-like structs** because they behave similarly to `()`, the unit type. <u>Unit-like structs can be useful when you need to implement a trait on some type but don’t have any data that you want to store in the type itself.</u> We’ll discuss traits in Ch. 10. Here’s an example of declaring and instantiating a unit struct named `AlwaysEqual`:
 
-```rust
+```rust Code 5.1.12
 struct AlwaysEqual;
 
 fn main() {
-    let _subject = AlwaysEqual;
+    let subject = AlwaysEqual;
 }
 ```
 
-Unit-like structs are particularly common when working with the trait system (e.g., marker traits, zero-sized types used with generics).
+>Imagine that later we’ll implement behavior for this type such that every instance of AlwaysEqual is always equal to every instance of any other type, perhaps to have a known result for testing purposes. We wouldn’t need any data to implement that behavior!
 
-## Ownership in Structs
+<Info>
+## Ownership of Struct Data
 
-In the `User` struct above we used `String` rather than `&str` so that each struct instance *owns* its data. Structs can store references, but that requires *lifetime annotations* (covered later). For now, prefer owned types like `String` over borrowed ones like `&str` inside struct definitions.
+>In the `User` struct definition in Code 5.1.1, we used the owned `String` type rather than the `&str` string slice type. This is a deliberate choice because we want each instance of this struct to own all of its data and for that data to be valid for as long as the entire struct is valid.
 
-```rust
-// ✅ Each User owns its strings
+><u>It’s also possible for structs to store references to data owned by something else, but to do so requires the use of **lifetimes**, a Rust feature that we’ll discuss in Ch. 10. Lifetimes ensure that the data referenced by a struct is valid for as long as the struct is.</u> Let’s say you try to store a reference in a struct without specifying lifetimes, like the following in Code 5.1.13; this won’t work:
+
+```rust Code 5.1.13
 struct User {
-    username: String,
-    email: String,
+    active: bool,
+    username: &str,
+    email: &str,
+    sign_in_count: u64,
 }
 
-// ❌ Requires lifetime annotations — covered in a later chapter
-// struct UserRef<'a> {
-//     username: &'a str,
-// }
+fn main() {
+    let user1 = User {
+        active: true,
+        username: "someusername123",
+        email: "someone@example.com",
+        sign_in_count: 1,
+    };
+}
 ```
 
-## Summary
+>The compiler will complain that it needs lifetime specifiers:
 
-- `struct` groups named fields into a custom type.
-- Instantiate with `TypeName { field: value, .. }`.
-- Field init shorthand avoids repetition when variable and field names match.
-- Struct update syntax (`..existing`) copies or moves remaining fields from another instance.
-- Tuple structs provide newtype wrappers without named fields.
-- Unit-like structs contain no data and are useful with traits.
+```text C-Output 5.1.13
+   Compiling ch_5_lab v0.1.0 (/var/home/z561/rust_projects/ch_5_lab)
+error[E0106]: missing lifetime specifier
+  --> src/main.rs:67:15
+   |
+67 |     username: &str,
+   |               ^ expected named lifetime parameter
+   |
+help: consider introducing a named lifetime parameter
+   |
+65 ~ struct User<'a> {
+66 |     active: bool,
+67 ~     username: &'a str,
+   |
+
+error[E0106]: missing lifetime specifier
+  --> src/main.rs:68:12
+   |
+68 |     email: &str,
+   |            ^ expected named lifetime parameter
+   |
+help: consider introducing a named lifetime parameter
+   |
+65 ~ struct User<'a> {
+66 |     active: bool,
+67 |     username: &str,
+68 ~     email: &'a str,
+   |
+
+For more information about this error, try `rustc --explain E0106`.
+error: could not compile `ch_5_lab` (bin "ch_5_lab") due to 2 previous errors
+```
+
+Although the official book does not explore the solution to this problem, we still want to present the working code. We will explain the underlying reasons for the compiler's errors and detail why Code 5.1.14 is accepted as a valid solution by the compiler, as proved by E-Output 5.1.14.
+
+<CodeGroup>
+```rust Code 5.1.14
+struct User<'a> {
+    _active: bool,
+    _username: &'a str,
+    _email: &'a str,
+    _sign_in_count: u64,
+}
+
+fn main() {
+    let _user1 = User {
+        _active: true,
+        _username: "someusername123",
+        _email: "someone@example.com",
+        _sign_in_count: 1,
+    };
+}
+```
+```text E-Output 5.1.14
+   Compiling ch_5_lab v0.1.0 (/var/home/z561/rust_projects/ch_5_lab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running `target/debug/ch_5_lab`
+```
+</CodeGroup>
+
+As we observed in Ch. 4 and section 3.2, data bound to variables can easily be dropped from memory. Because of this, <u>Rust cannot allow a struct to hold references (pointers) to memory locations that might be uninitialized or already freed</u>. Keep in mind that `&str` is a fat pointer to a string on the heap. Therefore, <u>Rust must guarantee at compile time that the pointers stored in `_username` and `_email` point to memory areas that actually exist when the struct is declared</u>.
+
+To enforce this, Rust requires the use of lifetime syntax, generally indicated as `'a` (though you can choose custom names like `'custom`, except for `'static`; what matters is the position and the leading `'`). In Code 5.1.14, we explicitly mark the `User` struct with the lifetime `'a` (`<'a>`), along with `_username` and `_email`. This explicitly dictates that <u>the `User` instance cannot, under any circumstances, live longer than the shortest-lived field it contains</u>.
+
+If you think about it carefully, this behavior is closely related to what we saw in Code 5.1.7 and Code 5.1.8. Once the `hello` string is moved out, <u>that specific field loses ownership and becomes invalid, which consequently renders the parent struct or tuple unusable as a whole</u>. Conceptually, this means the struct `strct1` or the tuple `tup1` cannot remain fully valid any longer than the shortest-lived field they contain!
+
+<p><u>The key difference in Code 5.1.14 is that tracking this validity becomes much harder for the compiler because `_username` and `_email` DO NOT own the data they point to. As a result, the compiler cannot simply rely on the 'standard' ownership mechanism. Instead, it requires us to explicitly establish a link between the deallocation of the memory areas pointed to by the struct's fields and the validity of the struct itself.</u></p>
+
+If the `User` instance were allowed to outlive the data referenced by `_username` or `_email`, the memory for those pointers could be freed BEFORE the `User` instance is destroyed. <u>This would result in a `User` instance containing dangling pointers.</u> By strictly enforcing this lifetime rule, Rust completely prevents this scenario.
+
+We can finally conclude this section by noting that <u>`"someusername123"` and `"someone@example.com"` are both string slices whose underlying data is hardcoded for the entire duration of the program's execution in the `.rodata` segment</u>, residing in the same memory area as the compiled code itself. In this specific case, the compiler immediately recognizes that the data referenced by both `_username` and `_email` will easily outlive any instance of `User`, as they possess the maximum possible lifetime (`'static`).
+</Info>
+
+## Deep Dive: The Mechanics of Explicit Lifetimes
+
+To fully grasp why the compiler demands lifetimes, it is crucial to understand that in Rust, a lifetime is not just a vague concept—it is a concrete part of the language's type system.
+
+When we define a reference without an explicit lifetime, such as `&str`, the compiler implicitly assigns it a lifetime based on the scope in which it was created (this is known as Non-Lexical Lifetimes, or NLL). However, when we place a reference inside a struct, the compiler loses the local context of that scope. It no longer knows where the referenced data lives or when it will be destroyed.
+
+By introducing the `<'a>` syntax, we are effectively declaring a generic lifetime parameter. Just as a generic type parameter (`<T>`) allows a struct to hold different types of data, a generic lifetime parameter (`<'a>`) allows a struct to hold references with varying lifespans.
+
+When we declare struct `User<'a>`, we are stating a rigorous rule for the Rust Borrow Checker:
+"<u>For any instance of `User`, find the concrete scope of the data passed into `_username`, and the concrete scope of the data passed into `_email`. Calculate whichever scope is the shortest. That shortest scope is now the concrete value of `'a`, and this `User` instance is strictly forbidden from existing beyond the end of `'a`.</u>"
+
+This mechanism is what allows Rust to achieve memory safety without a Garbage Collector. Instead of constantly checking memory validity at runtime, the Borrow Checker analyzes these lifetime constraints during compilation. If it detects any mathematical possibility that the struct could outlive `'a`—even by a single line of code—it throws a compilation error, absolutely guaranteeing that a dangling pointer can never exist in the compiled program.
+
+

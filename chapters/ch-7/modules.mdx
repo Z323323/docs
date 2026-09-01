@@ -1,168 +1,189 @@
 ---
-title: "Defining Modules to Control Scope and Privacy in Rust"
-sidebarTitle: "Modules"
-description: "Use mod to define modules in Rust, control public vs. private visibility with pub, and organize your code into logical, nested namespaces."
+title: "Control Scope and Privacy with Modules"
+sidebarTitle: "7.2 - Control Scope and Privacy with Modules"
 mode: "wide"
 ---
 
-Modules let you partition a crate's code into named, hierarchical namespaces — hiding implementation details while exposing a clean public API. The `mod` keyword introduces a module, and `pub` marks items as publicly accessible. Together they form Rust's privacy boundary system.
+>In this section, we’ll talk about modules and other parts of the module system, namely **paths**, <u>which allow you to name items</u>; the `use` keyword that <u>brings a path into scope</u>; and the `pub` keyword to make items public. We’ll also discuss the `as` keyword, external packages, and the glob operator.
 
-<Note>This chapter is part of The Rust Book – Almond Version, currently being written. For reference, see the [official Rust Book](https://doc.rust-lang.org/stable/book/).</Note>
+## Modules Cheat Sheet
 
-## The Restaurant Analogy
+>Before we get to the details of modules and paths, here we provide a quick reference on how modules, paths, the `use` keyword, and the `pub` keyword work in the compiler, and how most developers organize their code.
 
-The official Rust Book uses a restaurant to illustrate modules. A restaurant has a *front of house* (dining area, host stand, servers) and a *back of house* (kitchen, storage). Some things in the back of house are visible to customers; most are not. We can mirror this structure in code:
+>- **Start from the crate root**: When compiling a crate, the compiler first looks in the crate root file (_src/lib.rs_ for a library crate and _src/main.rs_ for a binary crate) for code to compile.
+>- **Declaring modules**: <u>In the crate root file, you can declare new modules</u>; say you declare a 'garden' module with `mod garden`. The compiler will look for the module’s code in these places:
+>   - Inline, <u>within curly brackets that replace the semicolon following `mod garden`</u>.
+>   - In the file <u>_src/garden.rs_</u>.
+>   - In the file <u>_src/garden/mod.rs_</u>.
+>- **Declaring submodules**: <u>In any file other than the crate root, you can declare submodules.</u> For example, you might declare `mod vegetables` in _src/garden.rs_. The compiler will look for the submodule’s code within the directory named for the parent module in these places:
+>   - Inline, <u>directly following `mod vegetables`, within curly brackets instead of the semicolon</u>.
+>   - In the file <u>_src/garden/vegetables.rs_</u>.
+>   - In the file <u>_src/garden/vegetables/mod.rs_</u>.
+>- **Paths to code in modules**: <u>Once a module is part of your crate, you can refer to code in that module from anywhere else in that same crate, as long as the privacy rules allow, using the path to the code.</u> For example, an `Asparagus` type in the garden vegetables module would be found at `crate::garden::vegetables::Asparagus`.
+>- **Private vs. public**: <u>Code within a module is private from its parent modules by default.</u> To make a module public, declare it with `pub mod` instead of `mod`. To make items within a public module public as well, use `pub` before their declarations.
+>- **The `use` keyword**: <u>Within a scope, the `use` keyword creates shortcuts to items to reduce repetition of long paths.</u> In any scope that can refer to `crate::garden::vegetables::Asparagus`, you can create a shortcut with `use crate::garden::vegetables::Asparagus`, and from then on you only need to write `Asparagus` to make use of that type in the scope.
 
-```rust
-// src/lib.rs
+>Here, we create a binary crate named `backyard` that illustrates these rules.
 
-mod front_of_house {
-    pub mod hosting {
-        pub fn add_to_waitlist() {
-            println!("Added to waitlist");
-        }
+<CodeGroup>
+```bash Command 7.2.1
+cd ~/rust_projects &&
+cargo new backyard &&
+cd backyard/src &&
+mkdir garden &&
+cd garden &&
+touch mod.rs &&
+mkdir vegetables &&
+cd vegetables &&
+touch mod.rs &&
+cd ../../.. &&
+# Output 7.2.1
+tree -L 4
+```
+```text Output 7.2.1
+.
+├── Cargo.toml
+└── src
+    ├── garden
+    │   ├── mod.rs
+    │   └── vegetables
+    │       └── mod.rs
+    └── main.rs
 
-        pub fn seat_at_table() {
-            println!("Seated at table");
-        }
-    }
+4 directories, 4 files
+```
+</CodeGroup>
 
-    mod serving {
-        fn take_order()  { /* ... */ }
-        fn serve_order() { /* ... */ }
-        fn take_payment(){ /* ... */ }
-    }
-}
+>The crate root file in this case is _src/main.rs_, and it contains:
 
-pub fn eat_at_restaurant() {
-    // Absolute path
-    crate::front_of_house::hosting::add_to_waitlist();
+```rust Code 7.2.1
+use crate::garden::vegetables::Asparagus;
 
-    // Relative path
-    front_of_house::hosting::seat_at_table();
+pub mod garden;
+
+fn main() {
+    let plant = Asparagus {};
+    println!("I'm growing {plant:?}!");
 }
 ```
 
-`hosting` and its functions are `pub`, so callers can reach them. `serving` is private — no outside code can call its functions.
+>The `pub mod garden` line tells the compiler to include the code it finds in _src/garden/mod.rs_, which is:
 
-## Privacy Rules
-
-- **Everything is private by default.** Functions, structs, enums, and nested modules are only visible within the module that defines them (and its descendants).
-- **`pub` makes an item visible to the parent module.** You must add `pub` at every level of the path you want to expose.
-- **Child modules can access private items in parent modules.** The privacy rules work downward, not upward.
-
-```rust
-mod outer {
-    fn private_fn() {}
-    pub fn public_fn() {}
-
-    mod inner {
-        pub fn call_parent() {
-            super::private_fn(); // ✅ child can call parent's private fn
-            super::public_fn();  // ✅ also fine
-        }
-    }
-}
+```rust Code 7.2.2
+pub mod vegetables;
 ```
 
-## Defining Nested Modules
+>Here, `pub mod vegetables` means the code in _src/garden/vegetables/mod.rs_ is included too. That code is:
 
-Modules can be nested arbitrarily deep. The full module tree for the restaurant example looks like this:
-
+```rust Code 7.2.3
+#[derive(Debug)]
+pub struct Asparagus {}
 ```
+
+Once you have created the project by running Command 7.2.1 and populated all the aforementioned files with their respective contents, execute Command 7.2.2; you should see Output 7.2.2 in your terminal!
+
+<CodeGroup>
+```bash Command 7.2.2
+cargo run
+```
+```text Output 7.2.2
+   Compiling backyard v0.1.0 (/var/home/z561/rust_projects/backyard)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running `/var/home/z561/rust_projects/backyard/target/debug/backyard`
+I'm growing Asparagus!
+```
+</CodeGroup>
+
+## Grouping Related Code in Modules
+
+>Modules let us organize code within a crate for readability and easy reuse. Modules also allow us to control the privacy of items because code within a module is private by default. <u>Private items are internal implementation details not available for outside use. We can choose to make modules and the items within them public, which exposes them to allow external code to use and depend on them.</u>
+
+>As an example, let’s write a library crate that provides the functionality of a restaurant. We’ll define the signatures of functions but leave their bodies empty to concentrate on the organization of the code rather than the implementation of a restaurant.
+
+>In the restaurant industry, some parts of a restaurant are referred to as 'front of house' and others as 'back of house'. 'Front of house' is where customers are; this encompasses where the hosts seat customers, servers take orders and payment, and bartenders make drinks. 'Back of house' is where the chefs and cooks work in the kitchen, dishwashers clean up, and managers do administrative work.
+
+>To structure our crate in this way, we can organize its functions into nested modules. Create a new <u>library</u> named `restaurant` by running Command 7.2.3.
+
+Command 7.2.3 will generate the entire `restaurant` directory structure, separating each module into its respective file.
+
+<CodeGroup>
+```bash Command 7.2.3
+cd ~/rust_projects &&
+cargo new restaurant --lib &&
+cd restaurant/src &&
+mkdir front_of_house &&
+cd front_of_house &&
+touch mod.rs &&
+mkdir hosting &&
+mkdir serving &&
+cd hosting &&
+touch mod.rs &&
+cd ../serving &&
+touch mod.rs &&
+cd ~/rust_projects/restaurant &&
+# Output 7.2.3
+tree -L 5
+```
+```text Output 7.2.3
+.
+├── Cargo.toml
+└── src
+    ├── front_of_house
+    │   ├── hosting
+    │   │   └── mod.rs
+    │   ├── mod.rs
+    │   └── serving
+    │       └── mod.rs
+    └── lib.rs
+
+5 directories, 5 files
+```
+</CodeGroup>
+
+At this point, you need to populate these files with code, just as we did earlier. Insert the corresponding code into each file as follows:
+
+- Inside _~/rust_projects/restaurant/src/lib.rs_, write Code 7.2.4.
+  ```rust Code 7.2.4
+  mod front_of_house;
+  ```
+- Inside _~/rust_projects/restaurant/src/front_of_house/mod.rs_, insert Code 7.2.5.
+  ```rust Code 7.2.5
+  mod hosting;
+  mod serving;
+  ```
+- Inside _~/rust_projects/restaurant/src/front_of_house/hosting/mod.rs_, insert Code 7.2.6.
+  ```rust Code 7.2.6
+  fn add_to_waitlist() {}
+
+  fn seat_at_table() {}
+  ```
+- Finally, inside _~/rust_projects/restaurant/src/front_of_house/serving/mod.rs_, insert Code 7.2.7.
+  ```rust Code 7.2.7
+  fn take_order() {}
+
+  fn serve_order() {}
+
+  fn take_payment() {}
+  ```
+
+>By using modules, we can group related definitions together and name why they’re related. Programmers using this code can navigate the code based on the groups rather than having to read through all the definitions, making it easier to find the definitions relevant to them. Programmers adding new functionality to this code would know where to place the code to keep the program organized.
+
+>Earlier, we mentioned that _src/main.rs_ and _src/lib.rs_ are called crate roots. The reason for their name is that <u>the contents of either of these two files form a module named `crate` at the root of the crate’s module structure, known as the module tree</u>.
+
+Module Tree below illustrates the internal structure generated by the Rust compiler based on the files and code we just wrote. As you can see, this hierarchy closely mirrors the one shown in Output 7.2.3 above. Personally, I prefer organizing files and directories using _mod.rs_ files (instead of using _module_name.rs_); <u>this approach provides a filesystem layout that visually and structurally aligns much better with the compiler's internal module tree</u>.
+
+```text Module Tree
 crate
  └── front_of_house
-      ├── hosting
-      │    ├── add_to_waitlist
-      │    └── seat_at_table
-      └── serving
-           ├── take_order
-           ├── serve_order
-           └── take_payment
+     ├── hosting
+     │   ├── add_to_waitlist
+     │   └── seat_at_table
+     └── serving
+         ├── take_order
+         ├── serve_order
+         └── take_payment
 ```
 
-```rust
-mod front_of_house {
-    pub mod hosting {
-        pub fn add_to_waitlist() {}
-    }
-    mod serving {
-        fn take_order() {}
-    }
-}
-```
+>This tree shows how some of the modules nest inside other modules; for example, `hosting` nests inside `front_of_house`. The tree also shows that some modules are **siblings**, meaning <u>they’re defined in the same module</u>; `hosting` and `serving` are siblings defined within `front_of_house`. If module A is contained inside module B, we say that module A is the **child** of module B and that module B is the **parent** of module A. Notice that the entire module tree is rooted under the implicit module named `crate`.
 
-## `pub` on Structs and Enums
-
-When you mark a **struct** `pub`, the struct itself is public but its fields remain private by default — you must mark each field `pub` individually:
-
-```rust
-pub mod back_of_house {
-    pub struct Breakfast {
-        pub toast: String,       // customer can choose
-        seasonal_fruit: String,  // kitchen decides — private
-    }
-
-    impl Breakfast {
-        pub fn summer(toast: &str) -> Breakfast {
-            Breakfast {
-                toast: String::from(toast),
-                seasonal_fruit: String::from("peaches"),
-            }
-        }
-    }
-}
-
-pub fn eat_at_restaurant() {
-    let mut meal = back_of_house::Breakfast::summer("Rye");
-    meal.toast = String::from("Wheat"); // ✅ toast is pub
-    // meal.seasonal_fruit = String::from("blueberries"); // ❌ private
-}
-```
-
-When you mark an **enum** `pub`, all its variants become public automatically:
-
-```rust
-pub mod back_of_house {
-    pub enum Appetizer {
-        Soup,   // automatically pub
-        Salad,  // automatically pub
-    }
-}
-```
-
-This asymmetry makes sense: a struct with some private fields is still usable, but an enum with private variants would often be impossible to match on.
-
-## The `use` Keyword (Preview)
-
-Typing full module paths everywhere is verbose. The `use` keyword brings a path into scope so you can use a shorter name:
-
-```rust
-use crate::front_of_house::hosting;
-
-pub fn eat_at_restaurant() {
-    hosting::add_to_waitlist(); // no need for full path
-}
-```
-
-The `use` keyword is covered in depth in the next section.
-
-## Inline vs File-Based Modules
-
-You can define a module inline (as shown above) or in a separate file. When you write:
-
-```rust
-// src/lib.rs
-mod front_of_house;
-```
-
-Rust looks for `src/front_of_house.rs` (or `src/front_of_house/mod.rs`) to supply the module's content. File-based modules are covered in the *Separating Modules into Files* section.
-
-## Summary
-
-- `mod name { }` defines a module inline; `mod name;` loads it from a file.
-- All items are private by default; `pub` exposes them to the parent module.
-- Children can access private items in their parent, but not vice versa.
-- `pub struct` makes the type public but not its fields — add `pub` per field.
-- `pub enum` makes the type and *all* its variants public.
-- Module nesting creates a tree; paths navigate it using `::` separators.
+>The module tree might remind you of the filesystem’s directory tree on your computer; this is a very apt comparison! Just like directories in a filesystem, you use modules to organize your code. And just like files in a directory, we need a way to find our modules.

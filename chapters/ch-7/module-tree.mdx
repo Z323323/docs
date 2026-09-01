@@ -1,37 +1,27 @@
 ---
-title: "Paths for Referring to Items in the Rust Module Tree"
-sidebarTitle: "Module Tree"
-description: "Navigate Rust's module tree with absolute and relative paths. Use super for parent-module references and understand how path resolution works."
+title: "Paths for Referring to an Item in the Module Tree"
+sidebarTitle: "7.3 - Paths for Referring to an Item in the Module Tree"
 mode: "wide"
 ---
 
-Once your code is organized into modules, you need a way to refer to the items inside them. Rust uses *path* syntax — similar to a file-system path — to navigate the module tree. Paths can be absolute (starting from the crate root) or relative (starting from the current module), and special keywords like `self` and `super` let you express relative positions cleanly.
+><u>To show Rust where to find an item in a module tree, we use a path in the same way we use a path when navigating a filesystem.</u>
 
-<Note>This chapter is part of The Rust Book – Almond Version, currently being written. For reference, see the [official Rust Book](https://doc.rust-lang.org/stable/book/).</Note>
+>A path can take two forms:
 
-## Absolute vs Relative Paths
+>- <p><u>An absolute path is the full path starting from a crate root; for code from an external crate, the absolute path begins with the crate name, and for code from the current crate, it starts with the literal `crate`.</u></p>
+>- <p><u>A relative path starts from the current module and uses `self`, `super`, or an identifier in the current module.</u></p>
 
-An **absolute path** starts at the crate root and uses `crate` as the first segment:
+><p><u>Both absolute and relative paths are followed by one or more identifiers separated by double colons (`::`).</u></p>
 
-```rust
-crate::front_of_house::hosting::add_to_waitlist();
-```
+>Say we want to call the `add_to_waitlist` function. <u>This is the same as asking: What’s the path of the `add_to_waitlist` function?</u>
 
-A **relative path** starts from the current module, using the module's name directly:
+>We’ll show two ways to call the `add_to_waitlist` function from a new function, `eat_at_restaurant`, defined in the crate root. These paths are correct, but there’s another problem remaining that will prevent this example from compiling as is. We’ll explain why in a bit.
 
-```rust
-front_of_house::hosting::add_to_waitlist();
-```
+>The `eat_at_restaurant` function is part of our library crate’s public API, so we mark it with the `pub` keyword.
 
-Both point to the same function. Prefer absolute paths when items might be moved to different modules (the path stays valid); prefer relative paths when items are likely to move together.
+Integrate Code 7.3.1 into _~/rust_projects/restaurant/src/lib.rs_, keeping in mind that `add_to_waitlist` is an empty function defined within _~/rust_projects/restaurant/src/front_of_house/hosting/mod.rs_!
 
-```rust
-mod front_of_house {
-    pub mod hosting {
-        pub fn add_to_waitlist() {}
-    }
-}
-
+```rust Code 7.3.1
 pub fn eat_at_restaurant() {
     // Absolute path
     crate::front_of_house::hosting::add_to_waitlist();
@@ -41,144 +31,319 @@ pub fn eat_at_restaurant() {
 }
 ```
 
-## `self` — Explicit Relative Reference
+>The first time we call the `add_to_waitlist` function in `eat_at_restaurant`, we use an absolute path. <u>The `add_to_waitlist` function is defined in the same crate as `eat_at_restaurant`, which means we can use the `crate` keyword to start an absolute path. We then include each of the successive modules until we make our way to `add_to_waitlist`.</u> You can imagine a filesystem with the same structure: We’d specify the path _/front_of_house/hosting/add_to_waitlist_ to run the `add_to_waitlist` program; <u>using the `crate` name to start from the crate root is like using `/` to start from the filesystem root in your shell</u>.
 
-`self` refers to the current module, making a relative path explicit:
+>The second time we call `add_to_waitlist` in `eat_at_restaurant`, we use a relative path. The path starts with `front_of_house`, the name of the module defined <u>at the same level of the module tree as `eat_at_restaurant`</u>. Here the filesystem equivalent would be using the path `front_of_house/hosting/add_to_waitlist`. <u>Starting with a module name means that the path is relative.</u>
 
-```rust
-mod front_of_house {
-    pub mod hosting {
-        pub fn add_to_waitlist() {}
+>Choosing whether to use a relative or absolute path is a decision you’ll make based on your project, and <u>it depends on whether you’re more likely to move item definition code separately from or together with the code that uses the item</u>. For example, if we moved the `front_of_house` module and the `eat_at_restaurant` function into a module named `customer_experience`, <u>we’d need to update the absolute path to `add_to_waitlist`, but the relative path would still be valid</u>. <u>However, if we moved the `eat_at_restaurant` function separately into a module named `dining`, the absolute path to the `add_to_waitlist` call would stay the same, but the relative path would need to be updated.</u> <u>Our preference in general is to specify absolute paths because it’s more likely we’ll want to move code definitions and item calls independently of each other.</u>
 
-        pub fn seat_at_table() {
-            self::add_to_waitlist(); // same as just add_to_waitlist()
-        }
-    }
-}
+>Let’s try to compile the `restaurant` crate and find out why it won’t compile yet! The errors we get are shown in Output 7.3.1.
+
+<CodeGroup>
+```bash Command 7.3.1
+cargo build
+```
+```text Output 7.3.1
+   Compiling restaurant v0.1.0 (/var/home/z561/rust_projects/restaurant)
+error[E0603]: module `hosting` is private
+ --> src/lib.rs:5:28
+  |
+5 |     crate::front_of_house::hosting::add_to_waitlist();
+  |                            ^^^^^^^  --------------- function `add_to_waitlist` is not publicly re-exported
+  |                            |
+  |                            private module
+  |
+note: the module `hosting` is defined here
+ --> src/front_of_house/mod.rs:1:1
+  |
+1 | mod hosting;
+  | ^^^^^^^^^^^^
+
+error[E0603]: module `hosting` is private
+ --> src/lib.rs:8:21
+  |
+8 |     front_of_house::hosting::add_to_waitlist();
+  |                     ^^^^^^^  --------------- function `add_to_waitlist` is not publicly re-exported
+  |                     |
+  |                     private module
+  |
+note: the module `hosting` is defined here
+ --> src/front_of_house/mod.rs:1:1
+  |
+1 | mod hosting;
+  | ^^^^^^^^^^^^
+
+For more information about this error, try `rustc --explain E0603`.
+error: could not compile `restaurant` (lib) due to 2 previous errors
+```
+</CodeGroup>
+
+>The error messages say that module `hosting` is private. In other words, we have the correct paths for the `hosting` module and the `add_to_waitlist` function, but Rust won’t let us use them because it doesn’t have access to the private sections. In Rust, all items (functions, methods, structs, enums, modules, and constants) are private to parent modules by default.
+
+><u>Items in a parent module can’t use the private items inside child modules, but items in child modules can use the items in their ancestor modules (!!).</u> This is because child modules wrap and hide their implementation details, but the child modules can see the context in which they’re defined.
+
+><p><u>Rust chose to have the module system function this way so that hiding inner implementation details is the default. That way, you know which parts of the inner code you can change without breaking the outer code. However, Rust does give you the option to expose inner parts of child modules’ code to outer ancestor modules by using the `pub` keyword to make an item public.</u></p>
+
+## Exposing Paths with the `pub` Keyword
+
+>We want the `eat_at_restaurant` function in the parent module to have access to the `add_to_waitlist` function in the child module, so we mark the `hosting` module in _~/rust_projects/restaurant/src/front_of_house/mod.rs_ with the `pub` keyword, as shown in Code 7.3.2.
+
+```rust Code 7.3.2 
+pub mod hosting;
+mod serving;
 ```
 
-`self` is rarely needed inside a module's own items, but it is required in `use` statements to re-export items at the current module level:
+>Unfortunately, Code 7.3.2 still results in compiler errors, as shown in Output 7.3.2.
 
-```rust
-pub use self::hosting::add_to_waitlist;
+<CodeGroup>
+```bash Command 7.3.2
+cargo build
+```
+```text Output 7.3.2
+   Compiling restaurant v0.1.0 (/var/home/z561/rust_projects/restaurant)
+error[E0603]: function `add_to_waitlist` is private
+ --> src/lib.rs:5:37
+  |
+5 |     crate::front_of_house::hosting::add_to_waitlist();
+  |                                     ^^^^^^^^^^^^^^^ private function
+  |
+note: the function `add_to_waitlist` is defined here
+ --> src/front_of_house/hosting/mod.rs:1:1
+  |
+1 | fn add_to_waitlist() { /* ... */ }
+  | ^^^^^^^^^^^^^^^^^^^^
+```
+</CodeGroup>
+
+>With this change, if we can access `front_of_house`, we can access `hosting`. But the contents of `hosting` are still private; making the module public doesn’t make its contents public. The `pub` keyword on a module only lets code in its ancestor modules refer to it, not access its inner code.
+
+>Let’s also make the `add_to_waitlist` function public by adding the `pub` keyword before its definition in _~/rust_projects/restaurant/src/front_of_house/hosting/mod.rs_, as in Code 7.3.3.
+
+```rust Code 7.3.3
+pub fn add_to_waitlist() {}
+
+fn seat_at_table() {}
 ```
 
-## `super` — Parent-Module Reference
+>Now the code will compile! To see why adding the `pub` keyword lets us use these paths in `eat_at_restaurant` with respect to the privacy rules, let’s look at the absolute and the relative paths.
 
-`super` moves up one level in the module tree, similar to `..` in a file path:
+>In the absolute path, we start with `crate`, the root of our crate’s module tree. <u>While `front_of_house` isn’t public, because `eat_at_restaurant` and `front_of_house` are siblings, we can refer to `front_of_house` from `eat_at_restaurant`.</u>
 
-```rust
-fn cook_order() {}
+>In the relative path, the logic is the same as the absolute path except for the first step: Rather than starting from the `crate` root, the path starts from `front_of_house`.
 
-mod back_of_house {
-    fn fix_incorrect_order() {
-        cook();
-        super::cook_order(); // calls function in the parent module
-    }
+>If you plan to share your library crate so that other projects can use your code, your public API is your contract with users of your crate that determines how they can interact with your code.
 
-    fn cook() {
-        println!("Cooking...");
-    }
-}
+<Info>
+### Best Practices for Packages with a Binary and a Library
+
+>We mentioned that a package can contain both a _src/main.rs_ binary crate root as well as a _src/lib.rs_ library crate root, and <u>both crates will have the package name by default</u>. Typically, packages with this pattern of containing both a library and a binary crate will have just enough code in the binary crate to start an executable that calls code defined in the library crate. This lets other projects benefit from the most functionality that the package provides.
+
+><p><u>The module tree should be defined in _src/lib.rs_. Then, any public items can be used in the binary crate by starting paths with the name of the package. The binary crate becomes a user of the library crate just like a completely external crate would use the library crate: It can only use the public API. This helps you design a good API; not only are you the author, but you’re also a client!</u></p>
+</Info>
+
+## Clarifying Module Visibility Mechanics
+
+At this point, just as we previously clarified the visibility mechanics for struct fields and methods, we will definitively clarify the rules surrounding module visibility, as the official book's coverage of this topic is somewhat superficial.
+
+First and foremost, as seen in the previous section, <u>if two items or modules share the same parent (meaning they are siblings), they can access one another regardless of whether they are declared as `pub`</u>! This is a fundamental concept that underpins the architecture of the mini-project demonstrated in this section, <u>allowing us to truly leverage private module visibility</u>.
+
+If you think about it, <u>the default private visibility of a module would be completely useless if the module itself were entirely inaccessible from its surrounding context</u>!
+
+### The Scenario: The Database Module
+
+Imagine you are building a public database module. For it to function properly, you need to manage network connections and validate passwords. Putting all of this logic into a single file would quickly become an unmaintainable mess, so you create two submodules: `connection` and `security`.
+
+You do NOT want the programmer consuming your database from the `main` function to manually tamper with the network protocol or the security keys. <u>You want them to exclusively use a convenient `connect` function.</u>
+
+Therefore, you keep connection and security PRIVATE. <u>However, because they are siblings and children of the database module, they can seamlessly communicate with one another, and their parent can freely use them.</u>
+
+Let's begin by setting up the crate structure. This example will not only clear up the thorny details of module visibility, but also reinforce the concepts from the previous section, as <u>this project will be structured as both a binary crate and a library crate</u>!
+
+<u>Cargo does not have a single flag to generate _main.rs_ and _lib.rs_ at once.</u> Instead, Cargo relies on a principle called <u>convention over configuration</u>. If it sees both a _main.rs_ and a _lib.rs_ in the _src_ directory, it automatically knows the project is a dual crate.
+
+To create this dual crate, it is idiomatic to generate the project as a library first, and then add the binary entry point. By running Command 7.3.3, Cargo generates a _lib.rs_ file complete with a useful boilerplate for unit tests. To add the binary crate, we simply create a _main.rs_ file inside the _src_ directory (as shown in Command 7.3.3) and define our `main`. Cargo will automatically recognize this dual structure.
+
+```bash Command 7.3.3
+cd ~/rust_projects &&
+cargo new mini_project --lib &&
+cd mini_project/src &&
+gedit main.rs
 ```
 
-`super` is especially useful for test modules, which often live inside the module they test:
+We will begin with the binary entry point. Add Code 7.3.4 to your _main.rs_ file and save.
 
-```rust
-pub fn add_two(x: i32) -> i32 {
-    x + 2
+```rust Code 7.3.4
+use mini_project::db;
+
+fn handle_db_connection() {
+    // --snip--
+    db::connect();
+    // --snip--   
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*; // bring everything from the parent module into scope
-
-    #[test]
-    fn it_adds_two() {
-        assert_eq!(add_two(2), 4);
-    }
-}
-```
-
-`use super::*` is idiomatic in test modules — it imports all public items from the parent without listing them individually.
-
-## Full Example: Navigating a Module Tree
-
-```rust
-// src/lib.rs
-
-mod garden {
-    pub mod vegetables {
-        pub struct Asparagus {
-            pub row: u32,
-        }
-
-        pub fn harvest(a: &Asparagus) {
-            println!("Harvesting asparagus from row {}", a.row);
-        }
-    }
-
-    mod tools {
-        fn sharpen() {}
-
-        pub fn prepare_field() {
-            sharpen();                              // sibling module item
-            super::vegetables::harvest(           // up to garden, then down
-                &super::vegetables::Asparagus { row: 3 }
-            );
-        }
-    }
-}
+/* 'main' can call 'handle_db_connection' which is not declared 'pub'
+   because 'main' and 'handle_db_connection' are siblings! */
 
 fn main() {
-    // Absolute path
-    let a = crate::garden::vegetables::Asparagus { row: 1 };
-    crate::garden::vegetables::harvest(&a);
-
-    // Relative path from crate root (same as absolute here)
-    let b = garden::vegetables::Asparagus { row: 2 };
-    garden::vegetables::harvest(&b);
+    // --snip--
+    handle_db_connection();
+    // --snip--
 }
 ```
 
-## `pub use` — Re-exporting Paths
+Code 7.3.4 simply delegates the management of the database connection to the `db` module.
 
-Sometimes you want to expose an item at a higher level of the module tree than where it is defined. `pub use` re-exports the item, creating a new public path:
+In Rust, <u>_lib.rs_ and _main.rs_ are two completely separate compilation units (two different crates) that happen to live in the same package</u>:
 
-```rust
-// src/lib.rs
+- <p><u>_src/lib.rs_ is the root of your Library Crate.</u></p>
+- <p><u>_src/main.rs_ is the root of your Binary Crate.</u></p>
 
-mod front_of_house {
-    pub mod hosting {
-        pub fn add_to_waitlist() {}
+Because <u>_main.rs_ is technically an external consumer of _lib.rs_, _main.rs_ cannot use `use db;` or `use crate::db;` (which only looks inside _main.rs_ itself). Instead, it must import the library using the package name defined in your Cargo.toml which is `mini_project`.</u>
+
+Now, execute Command 7.3.4 to generate the complete file and directory structure for the `mini_project` crate.
+
+```bash Command 7.3.4
+mkdir db &&
+cd db &&
+touch mod.rs &&
+mkdir connection security &&
+cd connection &&
+touch mod.rs &&
+cd ../security &&
+touch mod.rs &&
+cd ../..
+```
+
+At this point, run Command 7.3.5 to overwrite the contents of _lib.rs_ with the line `pub mod db;`.
+
+```bash Command 7.3.5
+echo "pub mod db;" > ./lib.rs
+```
+
+Next, execute Command 7.3.6 to open _~/rust_projects/mini_project/src/db/mod.rs_.
+
+```bash Command 7.3.6
+cd db && gedit mod.rs
+```
+
+Insert Code 7.3.5 into the _mod.rs_ file.
+
+```rust Code 7.3.5
+mod connection; // - private modules
+mod security; // -- /
+
+pub fn connect() {
+    // --snip--
+    
+    if security::validate_req() {
+        println!("Connected successfully!");
+    } else {
+        panic!("Access negated.");
     }
+    
+    connection::open();
+    // --snip--
 }
+```
 
-// Re-export so callers can use `crate::add_to_waitlist`
-// instead of `crate::front_of_house::hosting::add_to_waitlist`
-pub use crate::front_of_house::hosting::add_to_waitlist;
+<p><u>The `connect` function can call `connection::open` and `security::validate_req` because both the `connection` and `security` modules are, for all intents and purposes, siblings of the function itself!</u></p>
+
+`connection` and `security` were not declared as `pub` for one fundamental reason—which is the very core of why this section was written. <u>By keeping them private, we strictly hide the crate's internal machinery from the end-user. If these modules were public, a programmer consuming our library from _main.rs_ could bypass our intended workflow, manually manipulating network sockets or bypassing security validations. Instead, this private encapsulation forces the user to interact solely with our safe, clean public API (`connect`), while allowing our internal components to freely collaborate behind closed doors.</u>
+
+We are now ready to populate the remaining files. First, add Code 7.3.6 to _./db/connection/mod.rs_. Then, finally, insert Code 7.3.7 into _./db/security/mod.rs_.
+
+<Columns>
+<Column>
+```rust Code 7.3.6
+pub fn open() {
+    // --snip--
+}
+```
+</Column>
+<Column>
+```rust Code 7.3.7
+pub fn validate_req() -> bool {
+    true
+}
+```
+</Column>
+</Columns>
+
+These functions, along with all the code demonstrated here, are deliberately stripped-down examples meant to illustrate the bare skeleton of this type of architecture. The fact that `validate_req` simply returns `true` serves this exact purpose: keeping the example focused and easy to digest. Had we not done this, we would have had to write dozens of lines of code just to crudely simulate the architecture showcased in `mini_project`. For the sake of clarity, we opted for simplicity.
+
+To verify that the project builds and executes as expected, run Command 7.3.7. You should observe Output 7.3.7 printed to the terminal.
+
+<CodeGroup>
+```bash Command 7.3.7
+cargo run
+```
+```text Output 7.3.7
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `/var/home/z561/rust_projects/mini_project/target/debug/mini_project`
+Connected successfully!
+```
+</CodeGroup>
+
+## Starting Relative Paths with `super`
+
+>We can construct relative paths that begin in the parent module, rather than the current module or the crate root, by using `super` at the start of the path. This is like starting a filesystem path with the `..` syntax that means to go to the parent directory. Using `super` allows us to reference an item that we know is in the parent module, which can make rearranging the module tree easier when the module is closely related to the parent but the parent might be moved elsewhere in the module tree someday.
+
+>Returning to the `restaurant` (library) crate, consider the situation in which a chef fixes an incorrect order and personally brings it out to the customer.
+
+To begin, update _~/rust_projects/restaurant/src/lib.rs_ so that it looks exactly like Code 7.3.8:
+
+```rust Code 7.3.8
+mod front_of_house;
+mod back_of_house;
 
 pub fn eat_at_restaurant() {
-    add_to_waitlist(); // works via the re-export
+    // Absolute path
+    crate::front_of_house::hosting::add_to_waitlist();
+
+    // Relative path
+    front_of_house::hosting::add_to_waitlist();
+}
+
+fn deliver_order() {}
+```
+
+Now, let's create the _back_of_house_ directory and its _mod.rs_ file.
+
+```bash Command 7.3.8
+cd ~/rust_projects/restaurant/src &&
+mkdir back_of_house &&
+cd back_of_house &&
+gedit mod.rs
+```
+
+Next, populate the _mod.rs_ file with Code 7.3.9:
+
+```rust Code 7.3.9
+fn cook_order() {}
+
+fn fix_incorrect_order() {
+    cook_order();
+    super::deliver_order();
 }
 ```
 
-External callers can now write `my_crate::add_to_waitlist()` — the internal module structure is hidden. Re-exporting is how library authors present a clean public API that differs from the private internal organization.
+>The function `fix_incorrect_order` defined in the `back_of_house` module calls the function `deliver_order` defined in the parent module (`crate`) by specifying the path to `deliver_order`, starting with `super`.
 
-## Path Resolution Summary
+>Success! We think the `back_of_house` module and the `deliver_order` function are likely to stay in the same relationship to each other and get moved together should we decide to reorganize the crate’s module tree. Therefore, we used `super` so that we’ll have fewer places to update code in the future if this code gets moved to a different module.
 
-| Syntax | Meaning |
-|--------|---------|
-| `crate::a::b` | Absolute path from crate root |
-| `a::b` | Relative path from current module |
-| `self::a` | Explicit relative path (same module) |
-| `super::a` | Item in the parent module |
-| `pub use path` | Re-export an item under a new path |
+## Making Enums Public
 
-## Summary
+><u>If we make an enum public, all of its variants are then public.</u> We only need the `pub` before the `enum` keyword, as shown in Code 7.3.10.
 
-- Paths navigate the module tree using `::` between segments.
-- Absolute paths begin with `crate`; relative paths begin with the item's module name.
-- `self` refers to the current module; `super` refers to the parent.
-- `use super::*` is the idiomatic import in `#[cfg(test)]` modules.
-- `pub use` re-exports an item, allowing a clean public API that differs from the internal layout.
+```rust Code 7.3.10
+pub enum Appetizer {
+    Soup,
+    Salad,
+}
+```
+
+>Because we made the `Appetizer` enum public, we can use the `Soup` and `Salad` variants.
+
+>Enums aren’t very useful unless their variants are public; it would be annoying to have to annotate all enum variants with `pub` in every case, so the default for enum variants is to be public. Structs are often useful without their fields being public, so <u>struct fields follow the general rule of everything being private by default unless annotated with `pub`</u>.
+
+>There’s one more situation involving `pub` that we haven’t covered, and that is our last module system feature: the `use` keyword. We’ll cover `use` by itself first, and then we’ll show how to combine `pub` and `use`.

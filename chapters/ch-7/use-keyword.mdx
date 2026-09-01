@@ -1,212 +1,236 @@
 ---
-title: "Bringing Paths into Scope with the use Keyword in Rust"
-sidebarTitle: "use"
-description: "Use the use keyword to bring Rust module paths into scope, create idiomatic imports, re-export with pub use, and import multiple items with curly braces."
+title: "Bringing Paths into Scope with the 'use' Keyword"
+sidebarTitle: "7.4 - Bringing Paths into Scope with the 'use' Keyword"
 mode: "wide"
 ---
 
-Writing full module paths every time you reference an item gets verbose quickly. The `use` keyword brings a path into the current scope as a shorthand, letting you call functions, instantiate types, and use traits without repeating the full module hierarchy. Idiomatic Rust code relies heavily on well-chosen `use` statements.
+>Having to write out the paths to call functions can feel inconvenient and repetitive. Fortunately, there’s a way to simplify this process: <u>We can create a shortcut to a path with the `use` keyword once and then use the shorter name everywhere else in the scope</u>.
 
-<Note>This chapter is part of The Rust Book – Almond Version, currently being written. For reference, see the [official Rust Book](https://doc.rust-lang.org/stable/book/).</Note>
+In Code 7.4.1, we use the `use` keyword to bring `crate::front_of_house::hosting` (defined in _~/rust_projects/restaurant/src/front_of_house/hosting/mod.rs_) into the global scope of _lib.rs_. This creates a shortcut so that, when writing the `eat_at_restaurant` function, we only need to call `hosting::add_to_waitlist` instead of writing out the full path.
 
-## Basic `use`
+```rust Code 7.4.1
+mod front_of_house;
+mod back_of_house;
 
-```rust
+use crate::front_of_house::hosting;
+
+pub fn eat_at_restaurant() {
+    // Absolute path
+    crate::front_of_house::hosting::add_to_waitlist();
+
+    // Relative path
+    front_of_house::hosting::add_to_waitlist();
+    
+    // Absolute path shortcut
+    hosting::add_to_waitlist();
+}
+
+fn deliver_order() {}
+```
+
+Remember this is possible because `front_of_house` is a sibling of `eat_at_restaurant` (it's not defined with the `pub` keyword), while `hosting` and `add_to_waitlist` are both defined as `pub`.
+
+>Note that <u>`use` only creates the shortcut for the particular scope in which the `use` occurs</u>.
+
+## Creating Idiomatic `use` Paths
+
+>In Code 7.4.1, you might have wondered why we specified `use crate::front_of_house::hosting` and then called `hosting::add_to_waitlist` in `eat_at_restaurant`, rather than specifying the `use` path all the way out to the `add_to_waitlist` function to achieve the same result, as in Code 7.4.2.
+
+```rust Code 7.4.2
+mod front_of_house;
+mod back_of_house;
+
+use crate::front_of_house::hosting::add_to_waitlist;
+
+pub fn eat_at_restaurant() {
+    // Absolute path
+    crate::front_of_house::hosting::add_to_waitlist();
+
+    // Relative path
+    front_of_house::hosting::add_to_waitlist();
+    
+    // Absolute path shortcut
+    add_to_waitlist();
+}
+
+fn deliver_order() {}
+```
+
+>Although both Code 7.4.1 and Code 7.4.2 accomplish the same task, <u>Code 7.4.1 is the idiomatic way to bring a function into scope with `use`</u>. <u>Bringing the function’s parent module into scope with `use` means we have to specify the parent module when calling the function. Specifying the parent module when calling the function makes it clear that the function isn’t locally defined while still minimizing repetition of the full path.</u> Code 7.4.2 is unclear as to where `add_to_waitlist` is defined.
+
+>On the other hand, <u>when bringing in structs, enums, and other items with `use`, it’s idiomatic to specify the full path</u>. Code 7.4.3 shows the idiomatic way to bring the standard library’s `HashMap` struct into the scope of a binary crate.
+
+```rust Code 7.4.3
 use std::collections::HashMap;
 
 fn main() {
-    let mut scores: HashMap<String, u32> = HashMap::new();
-    scores.insert(String::from("Alice"), 100);
-    scores.insert(String::from("Bob"),   85);
-    println!("{:?}", scores);
+    let mut map = HashMap::new();
+    map.insert(1, 2);
 }
 ```
 
-After the `use` declaration, `HashMap` is available directly in scope. Without it you would write `std::collections::HashMap` every time.
+><u>The exception to this idiom is if we’re bringing two items with the same name into scope</u> with `use` statements, because Rust doesn’t allow that. Code 7.4.4 shows how to bring two `Result` types into scope that have the same name but different parent modules, and how to refer to them.
 
-## Idiomatic `use` Patterns
+```rust Code 7.4.4
+use std::fmt;
+use std::io;
 
-### Functions: Import the Parent Module
+fn function1() -> fmt::Result {
+    // --snip--
+}
 
-For functions, the idiom is to bring the *parent module* into scope so that the call site makes the function's origin clear:
-
-```rust
-// ✅ Idiomatic: function's module is visible at call site
-use crate::front_of_house::hosting;
-hosting::add_to_waitlist();
-
-// ❌ Less idiomatic: looks like a locally-defined function
-use crate::front_of_house::hosting::add_to_waitlist;
-add_to_waitlist();
+fn function2() -> io::Result<()> {
+    // --snip--
+}
 ```
 
-### Types: Import the Full Path
+>As you can see, using the parent modules distinguishes the two `Result` types. If instead we specified `use std::fmt::Result` and `use std::io::Result`, we’d have two `Result` types in the same scope, and Rust wouldn’t know which one we meant when we used `Result`.
 
-For structs, enums, and other types, the idiom is to bring the full path into scope:
+## Providing New Names with the `as` Keyword
 
-```rust
-// ✅ Idiomatic for types
-use std::collections::HashMap;
-let map = HashMap::new();
+>There’s another solution to the problem of bringing two types of the same name into the same scope with `use`: After the path, we can specify as and a new local name, or alias, for the type. Code 7.4.5 shows another way to write the code in Code 7.4.4 by renaming one of the two `Result` types using `as`.
 
-// ❌ Unnecessarily verbose at call site
-use std::collections;
-let map = collections::HashMap::new();
-```
-
-The exception is when two types from different modules share the same name (see `as` aliases below).
-
-## `as` — Alias for Disambiguation
-
-When two types share a name, use `as` to create a local alias:
-
-```rust
+```rust Code 7.4.5
 use std::fmt::Result;
 use std::io::Result as IoResult;
 
-fn fmt_result() -> Result { Ok(()) }
-fn io_result()  -> IoResult<()> { Ok(()) }
+fn function1() -> Result {
+    // --snip--
+}
+
+fn function2() -> IoResult<()> {
+    // --snip--
+}
 ```
 
-`as` is also used to give any import a more convenient name:
+>In the second `use` statement, we chose the new name `IoResult` for the `std::io::Result` type, which won’t conflict with the `Result` from `std::fmt` that we’ve also brought into scope. Code 7.4.4 and Code 7.4.5 are considered idiomatic, so the choice is up to you!
 
-```rust
-use std::collections::HashMap as Map;
+## Re-exporting Names with `pub use`
 
+><u>When we bring a name into scope with the `use` keyword, the name is private to the scope into which we imported it. To enable code outside that scope to refer to that name as if it had been defined in that scope, we can combine `pub` and `use`.</u> This technique is called **re-exporting** because we’re bringing an item into scope but also making that item available for others to bring into their scope.
+
+>Code 7.4.6 shows Code 7.4.1 with `use` in the root module changed to `pub use`.
+
+```rust Code 7.4.6
+// --snip--
+
+pub use crate::front_of_house::hosting;
+
+// --snip--
+```
+
+>Before this change, external code would have to call the `add_to_waitlist` function by using the path `restaurant::front_of_house::hosting::add_to_waitlist()`, which also would have required the `front_of_house` module to be marked as `pub`. Now that this `pub use` has re-exported the `hosting` module from the root module, <u>external code can use the path `restaurant::hosting::add_to_waitlist()`</u> instead.
+
+<Warning>
+You must be particularly careful when using `pub use`. Because it acts as a module re-export, <u>it can completely bypass the carefully crafted security of your architecture</u>!
+
+For example, let's look back at the `db` module from the previous section. The entire goal of that module structure was to prevent a programmer from directly accessing the `connection` and `security` modules, providing instead a single, safe interface: the `connect` function. <u>If you were to re-export the `connection::open` and/or `security::validate_req` functions directly in _~/rust_projects/mini_project/src/db/mod.rs_</u>—allowing an external user to call `mini_project::db::connection::open` and `mini_project::db::security::validate_req`—<u>you would shatter that deliberately encapsulated design</u>.
+
+Currently, trying to call those internal functions directly from _main.rs_ generates the compiler error shown in C-Output 7.4.7.
+
+<CodeGroup>
+```rust Code 7.4.7
 fn main() {
-    let mut m: Map<&str, i32> = Map::new();
-    m.insert("x", 1);
+    // --snip--
+    db::connection::open();
+    db::security::validate_req();
+    // --snip--
 }
 ```
+```text C-Output 7.4.7
+   Compiling mini_project v0.1.0 (/var/home/z561/rust_projects/mini_project)
+error[E0603]: module `connection` is private
+  --> src/main.rs:15:9
+   |
+15 |     db::connection::open();
+   |         ^^^^^^^^^^  ---- function `open` is not publicly re-exported
+   |         |
+   |         private module
+   |
+note: the module `connection` is defined here
+  --> src/db/mod.rs:1:1
+   |
+ 1 | mod connection;
+   | ^^^^^^^^^^^^^^
 
-## `pub use` — Re-exporting Items
+error[E0603]: module `security` is private
+  --> src/main.rs:16:9
+   |
+16 |     db::security::validate_req();
+   |         ^^^^^^^^  ------------ function `validate_req` is not publicly re-exported
+   |         |
+   |         private module
+   |
+note: the module `security` is defined here
+  --> src/db/mod.rs:2:1
+   |
+ 2 | mod security;
+   | ^^^^^^^^^^^^
 
-`pub use` makes an imported item part of your crate's public API:
-
-```rust
-// src/lib.rs
-mod front_of_house {
-    pub mod hosting {
-        pub fn add_to_waitlist() {}
-    }
-}
-
-// Re-export so callers don't need to know the internal structure
-pub use crate::front_of_house::hosting::add_to_waitlist;
+For more information about this error, try `rustc --explain E0603`.
+error: could not compile `mini_project` (bin "mini_project") due to 2 previous errors
 ```
+</CodeGroup>
 
-External users of your crate can now call `my_crate::add_to_waitlist()` without knowing it lives deep inside `front_of_house::hosting`. This is how library authors expose a clean, stable public API while freely reorganizing internal modules.
+However, <u>using `pub use` inside _~/rust_projects/mini_project/src/db/mod.rs_ as shown in Code 7.4.8 would expose them, allowing _main.rs_ to call them directly</u>, as demonstrated in E-Output 7.4.9.
 
-## Nested Paths — Grouping Imports
+<Columns>
+<Column>
+```rust Code 7.4.8
+mod connection;
+mod security;
 
-When you need multiple items from the same module, group them with curly braces to reduce line count:
+pub use connection::open as unsafe_connection_open;
+pub use security::validate_req as dang_validate_req;
 
-```rust
-// Instead of:
-use std::cmp::Ordering;
-use std::io;
-
-// Write:
-use std::{cmp::Ordering, io};
+// --snip--
 ```
-
-You can also mix a module itself with items inside it using `self`:
-
-```rust
-// Instead of:
-use std::io;
-use std::io::Write;
-
-// Write:
-use std::io::{self, Write};
-```
-
-Nested paths can go as deep as needed:
-
-```rust
-use std::collections::{HashMap, HashSet, BTreeMap};
-```
-
-## Glob Imports with `*`
-
-The glob operator (`*`) brings *all* public items from a module into scope:
-
-```rust
-use std::collections::*;
-
+</Column>
+<Column>
+<CodeGroup>
+```rust Code 7.4.9
 fn main() {
-    let mut map: HashMap<&str, i32> = HashMap::new(); // no prefix needed
-    let mut set: HashSet<i32>       = HashSet::new();
+    // --snip--
+    db::unsafe_connection_open();
+    db::dang_validate_req();
+    // --snip--
 }
 ```
-
-Globs are generally discouraged in production code because they make it hard to tell where a name comes from. They are used in:
-
-- **Test modules**: `use super::*;` to import all items under test.
-- **Prelude modules**: libraries that define a `prelude` module for users to glob-import.
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*; // idiomatic glob in tests
-    // ...
-}
+```text E-Output 7.4.9
+   Compiling mini_project v0.1.0 (/var/home/z561/rust_projects/mini_project)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running `target/debug/mini_project`
+Connected successfully!
 ```
+</CodeGroup>
+</Column>
+</Columns>
+</Warning>
 
-## `use` in Different Scopes
+## Using External Packages
 
-`use` is not limited to the crate root — it can appear anywhere a statement is valid:
+>In Ch. 2, we programmed a guessing game project that used an external package called `rand` to get random numbers. To use `rand` in our project, we added `rand = "0.8.5"` to _Cargo.toml_.
 
-```rust
-fn main() {
-    use std::collections::HashMap; // scoped to this function
-    let m: HashMap<&str, i32> = HashMap::new();
-}
+>Adding `rand` as a dependency in _Cargo.toml_ tells Cargo to download the `rand` package and any dependencies from [[crates.io](https://crates.io)] and make `rand` available to our project.
 
-// HashMap is not in scope here
-```
+>Then, to bring `rand` definitions into the scope of our package, we added the `use rand::Rng` line starting with the name of the crate, `rand`, and listed the items we wanted to bring into scope.
 
-This is useful for limiting the blast radius of a wildcard import or making the origin of a name obvious in a long function.
+>Note that the standard `std` library is also a crate that’s external to our package. Because the standard library is shipped with the Rust language, we don’t need to change _Cargo.toml_ to include `std`. But we do need to refer to it with `use` to bring items from there into our package’s scope. For example, with `HashMap` we would use the line `use std::collections::HashMap`.
 
-## A Complete Example
+## Using Nested Paths to Clean Up use Lists
 
-```rust
-use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Display, Formatter};
+>If we’re using multiple items defined in the same crate or same module, listing each item on its own line can take up a lot of vertical space in our files. For example, the `use std::cmp::Ordering` and `use std::io` statements we had in the guessing game in Ch. 2 bring items from `std` into scope.
 
-#[derive(Debug)]
-struct Student {
-    name: String,
-    grades: Vec<u32>,
-}
+>Instead, we can use nested paths to bring the same items into scope in one line.
 
-impl Display for Student {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let avg: f64 = self.grades.iter().sum::<u32>() as f64
-            / self.grades.len() as f64;
-        write!(f, "{} (avg: {:.1})", self.name, avg)
-    }
-}
+For example, by writing `use std::{cmp::Ordering, io}` we bring both `std::cmp::Ordering` and `std::io` in scope, in a single line.
 
-fn main() {
-    let mut roster: HashMap<u32, Student> = HashMap::new();
-    roster.insert(1, Student { name: "Alice".into(), grades: vec![90, 85, 92] });
-    roster.insert(2, Student { name: "Bob".into(),   grades: vec![78, 82, 80] });
+>In bigger programs, bringing many items into scope from the same crate or module using nested paths can reduce the number of separate `use` statements needed by a lot!
 
-    let ids: HashSet<u32> = roster.keys().copied().collect();
-    for id in &ids {
-        if let Some(s) = roster.get(id) {
-            println!("Student {}: {}", id, s);
-        }
-    }
-}
-```
+>We can use a nested path at any level in a path, which is useful when combining two `use` statements that share a subpath. For example, `use std::io::{self, Write}` brings `std::io` and `std::io::Write` into scope.
 
-## Summary
+## Importing Items with the Glob Operator
 
-- `use path;` creates a local shorthand for a module path.
-- Idiomatic pattern: import the parent module for functions, the full path for types.
-- `as` creates an alias to avoid name collisions or improve readability.
-- `pub use` re-exports an item as part of your crate's public API.
-- Curly-brace syntax (`use std::{io, fs}`) and `self` group imports from the same module.
-- Glob imports (`use module::*`) should be used sparingly — mainly in test modules and preludes.
+>If we want to bring all public items defined in a path into scope, we can specify that path followed by the `*` glob operator: `use std::collections::*`.
+
+>This `use` statement brings all public items defined in `std::collections` into the current scope. Be careful when using the glob operator! Glob can make it harder to tell what names are in scope and where a name used in your program was defined.

@@ -1,223 +1,197 @@
 ---
-title: "Rust match Expressions: Exhaustive Pattern Matching Guide"
-sidebarTitle: "match"
-description: "Use Rust's match expression for exhaustive pattern matching on enums, integers, and more. Covers arms, catch-all patterns, and binding matched values."
+title: "The 'match' Control Flow Construct"
+sidebarTitle: "6.2 - The 'match' Control Flow Construct"
 mode: "wide"
 ---
 
-`match` is Rust's most powerful control-flow construct. It compares a value against a series of *patterns* and executes the code for the first pattern that matches. Unlike a `switch` statement in C or Java, Rust's `match` is *exhaustive* — the compiler guarantees you have handled every possible case — and each arm can bind matched values to variables.
+>Rust has an extremely powerful control flow construct called `match` that allows you to <u>compare a value against a series of patterns and then execute code based on which pattern matches</u>. <u>Patterns can be made up of literal values, variable names, wildcards, and many other things</u>; Ch. 19 covers all the different kinds of patterns and what they do. The power of `match` comes from the expressiveness of the patterns and the fact that <u>the compiler confirms that all possible cases are handled</u>.
 
-<Note>This chapter is part of The Rust Book – Almond Version, currently being written. For reference, see the [official Rust Book](https://doc.rust-lang.org/stable/book/).</Note>
+>We can write a function that takes an unknown US coin and, in a similar way as the counting machine, determines which coin it is and returns its value in cents, as shown in Code 6.2.1.
 
-## Basic `match` Syntax
-
-```rust
+```rust Code 6.2.1
 enum Coin {
-    Penny,
-    Nickel,
-    Dime,
-    Quarter,
+    Penny, // - \
+    Nickel, // - unit-like structs 
+    Dime, // -- /
+    Quarter, // | 
 }
 
-fn value_in_cents(coin: Coin) -> u32 {
+fn value_in_cents(coin: Coin) -> u8 {
     match coin {
-        Coin::Penny   => 1,
-        Coin::Nickel  => 5,
-        Coin::Dime    => 10,
+        Coin::Penny => 1,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
         Coin::Quarter => 25,
     }
 }
 ```
 
-Each *arm* has the form `pattern => expression`. The value of the matched arm becomes the value of the entire `match` expression. Arms are separated by commas; multi-line arm bodies use `{ }`.
+>Let’s break down the `match` in the `value_in_cents` function. First, we list the `match` keyword followed by an <u>expression</u>, which in this case is the value `coin`.
 
-```rust
-fn value_in_cents(coin: Coin) -> u32 {
+>This seems very similar to a conditional expression used with `if`, but there’s a big difference: With `if`, the condition needs to evaluate to a Boolean value, but here <u>it can be any type</u>. The type of `coin` in this example is the `Coin` enum that we defined on the first line.
+
+>Next are the `match` **arms**. <u>An arm has two parts: a pattern and some code.</u> The first arm here has a pattern that is the value `Coin::Penny` and then the `=>` operator that separates the pattern and the code to run. The code in this case is just the value `1`. Each arm is separated from the next with a comma.
+
+><u>When the `match` expression executes, it compares the resultant value against the pattern of each arm, in order. If a pattern matches the value, the code associated with that pattern is executed. If that pattern doesn’t match the value, execution continues to the next arm.</u> We can have as many arms as we need.
+
+><p><u>The code associated with each arm is an expression, and the resultant value of the expression in the matching arm is the value that gets returned for the entire `match` expression.</u></p>
+
+><u>If you want to run multiple lines of code in a match arm, you must use curly brackets, and the comma following the arm is then optional.</u> For example, the following code prints `Lucky penny!` every time the method is called with a `Coin::Penny`, but it still returns the last value of the block, `1`:
+
+```rust Code 6.2.2
+fn value_in_cents(coin: Coin) -> u8 {
     match coin {
         Coin::Penny => {
             println!("Lucky penny!");
             1
         }
-        Coin::Nickel  => 5,
-        Coin::Dime    => 10,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
         Coin::Quarter => 25,
     }
 }
 ```
 
-## Binding Values in Match Arms
+## Patterns That Bind to Values
 
-Patterns can *bind* parts of the matched value to variables. Here `Quarter` carries a `UsState` variant:
+>Another useful feature of match arms is that <u>they can bind to the parts of the values that match the pattern</u>. <u>This is how we can extract values out of enum variants.</u>
 
-```rust
-#[derive(Debug)]
+>As an example, let’s change one of our enum variants to hold data inside it. From 1999 through 2008, the United States minted quarters with different designs for each of the 50 states on one side. No other coins got state designs, so only quarters have this extra value. We can add this information to our `enum` by changing the `Quarter` variant to include a `UsState` value stored inside it, which we’ve done in Code 6.2.3.
+
+>In the match expression for this code, we add a variable called `state` to the pattern that matches values of the variant `Coin::Quarter`. When a `Coin::Quarter` matches, the `state` variable will bind to the value of that quarter’s state. Then, we can use `state` in the code for that arm, like so:
+
+```rust Code 6.2.3
+#[derive(Debug)] // so we can inspect the state
 enum UsState {
+    Alabama,
     Alaska,
-    Arizona,
-    California,
-    // ...
+    // --snip--
 }
 
 enum Coin {
     Penny,
     Nickel,
     Dime,
-    Quarter(UsState), // Quarter holds a state
+    Quarter(UsState),
 }
 
-fn value_in_cents(coin: Coin) -> u32 {
+fn value_in_cents(coin: Coin) -> u8 {
     match coin {
-        Coin::Penny   => 1,
-        Coin::Nickel  => 5,
-        Coin::Dime    => 10,
+        Coin::Penny => 1,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
         Coin::Quarter(state) => {
-            println!("State quarter from {:?}!", state);
+            println!("State quarter from {state:?}!");
             25
         }
     }
 }
-
-fn main() {
-    let c = Coin::Quarter(UsState::Alaska);
-    println!("{} cents", value_in_cents(c));
-    // "State quarter from Alaska!" then "25 cents"
-}
 ```
 
-The variable `state` is bound to the `UsState` value embedded in the `Quarter` variant.
+>If we were to call `value_in_cents(Coin::Quarter(UsState::Alaska))`, `coin` would be `Coin::Quarter(UsState::Alaska)`. When we compare that value with each of the match arms, none of them match until we reach `Coin::Quarter(state)`. <u>At that point, the binding for `state` will be the value `UsState::Alaska`. We can then use that binding in the `println!` expression, thus getting the inner state value out of the `Coin` enum variant for `Quarter`.</u>
 
-## Matching `Option<T>`
+## The `Option<T>` `match` Pattern
 
-`match` is the natural companion to `Option<T>`:
+>In the previous section, we wanted to get the inner `T` value out of the `Some` case when using `Option<T>`; we can also handle `Option<T>` using `match`, as we did with the `Coin` enum! Instead of comparing coins, we’ll compare the variants of `Option<T>`, but the way the `match` expression works remains the same.
 
-```rust
-fn increment(opt: Option<i32>) -> Option<i32> {
-    match opt {
-        None    => None,
-        Some(n) => Some(n + 1),
-    }
-}
+>Let’s say we want to write a function that takes an `Option<i32>` and, if there’s a value inside, adds 1 to that value. If there isn’t a value inside, the function should return the `None` value and not attempt to perform any operations.
 
-fn main() {
-    let five    = Some(5);
-    let six     = increment(five);
-    let nothing = increment(None);
-
-    println!("{:?}", six);     // Some(6)
-    println!("{:?}", nothing); // None
-}
-```
-
-This pattern is so common that `Option` provides a `.map()` method that does the same thing, but explicit `match` makes the logic crystal-clear.
-
-## Exhaustiveness: The Compiler Has Your Back
-
-If you forget a variant, the compiler refuses to compile:
-
-```rust
-fn value_in_cents(coin: Coin) -> u32 {
-    match coin {
-        Coin::Penny  => 1,
-        Coin::Nickel => 5,
-        // Coin::Dime and Coin::Quarter are not covered
-        // ❌ ERROR: non-exhaustive patterns
-    }
-}
-```
-
-This guarantee is invaluable when you add a new variant later — every `match` in your codebase that doesn't cover it becomes a compile error, forcing you to update all call sites.
-
-## Catch-All Patterns
-
-Sometimes you only care about a few specific values and want a default for everything else. Use a variable name (often `other`) or `_` as a catch-all:
-
-```rust
-fn describe_number(n: u32) -> &'static str {
-    match n {
-        1 => "one",
-        2 => "two",
-        3 => "three",
-        other => {
-            println!("Got an unhandled number: {}", other);
-            "something else"
-        }
-    }
-}
-```
-
-Use `_` when you don't need to use the caught value:
-
-```rust
-fn describe_number(n: u32) -> &'static str {
-    match n {
-        1 => "one",
-        2 => "two",
-        3 => "three",
-        _ => "something else", // discard the value
-    }
-}
-```
-
-The catch-all arm must come **last**; any arm after it would be unreachable.
-
-## Matching Ranges and Guards
-
-Patterns can include ranges (`1..=5`) and *match guards* (extra conditions with `if`):
-
-```rust
-fn classify(n: i32) -> &'static str {
-    match n {
-        i32::MIN..=-1 => "negative",
-        0             => "zero",
-        1..=9         => "small positive",
-        10..=99       => "medium positive",
-        _             => "large positive",
-    }
-}
-
-fn main() {
-    println!("{}", classify(-5));   // "negative"
-    println!("{}", classify(0));    // "zero"
-    println!("{}", classify(7));    // "small positive"
-    println!("{}", classify(42));   // "medium positive"
-    println!("{}", classify(1000)); // "large positive"
-}
-```
-
-Match guards add a condition after the pattern:
-
-```rust
-fn main() {
-    let pair = (2, -3);
-
-    match pair {
-        (x, y) if x == y   => println!("Equal"),
-        (x, y) if x + y == 0 => println!("Opposites"),
-        (x, _) if x % 2 == 0 => println!("First is even"),
-        _                   => println!("No special case"),
-    }
-}
-```
-
-## Multiple Patterns with `|`
-
-Use `|` to match multiple patterns in one arm:
-
-```rust
-fn main() {
-    let x = 3;
+```rust Code 6.2.4
+fn plus_one(x: Option<i32>) -> Option<i32> {
     match x {
-        1 | 2 => println!("one or two"),
-        3 | 4 => println!("three or four"),
-        _     => println!("something else"),
+        None => None,
+        Some(i) => Some(i + 1),
     }
+}
+
+fn main() {
+    let five = Some(5);
+    let six = plus_one(five);
+    let none = plus_one(None);
 }
 ```
 
-## Summary
+>When we call `plus_one(five)`, the variable `x` in the body of `plus_one` will have the value `Some(5)`. We then compare that against <u>each</u> match arm. The `Some(5)` value doesn’t match the pattern `None`, so we continue to the next arm. Does `Some(5)` match `Some(i)`? It does! We have the same variant. The `i` binds to the value contained in `Some`, so `i` takes the value `5`. The code in the match arm is then executed, so we add 1 to the value of `i` and create a new `Some` value with our total `6` inside. Now let’s consider the second call of `plus_one` where `x` is `None`. We enter the match and compare to the first arm: `None => None`. It matches! There’s no value to add to, so the program stops and returns the `None` value on the right side of `=>`. Because the first arm matched, no other arms are compared.
 
-- `match` compares a value against a series of patterns and executes the matching arm.
-- Arms can bind matched values into named variables.
-- `match` is *exhaustive*: the compiler requires every case to be covered.
-- Use a named catch-all (`other`) to access the unmatched value, or `_` to discard it.
-- Ranges (`1..=5`), match guards (`if condition`), and OR patterns (`|`) add expressive power.
+>Combining `match` and enums is useful in many situations. You’ll see this pattern a lot in Rust code: `match` against an enum, bind a variable to the data inside, and then execute code based on it. It’s a bit tricky at first, but once you get used to it, you’ll wish you had it in all languages. It’s consistently a user favorite.
+
+## Matches Are Exhaustive
+
+<u>The arms’ patterns must cover all possibilities.</u> Consider this version of our `plus_one` function, which has a bug and won’t compile (C-Output 6.2.5):
+
+<CodeGroup>
+```rust Code 6.2.5
+fn plus_one(x: Option<i32>) -> Option<i32> {
+    match x {
+        Some(i) => Some(i + 1),
+    }
+}
+```
+```text C-Output 6.2.5
+error[E0004]: non-exhaustive patterns: `None` not covered
+```
+</CodeGroup>
+
+>Rust knows that we didn’t cover every possible case and even knows which pattern we forgot! Matches in Rust are exhaustive: <u>We must exhaust every last possibility in order for the code to be valid</u>. Especially in the case of `Option<T>`, when Rust prevents us from forgetting to explicitly handle the `None` case, it protects us from assuming that we have a value when we might have null, thus making the billion-dollar mistake discussed earlier impossible.
+
+## Catch-All Patterns and the `_` Placeholder
+
+><u>Using enums, we can also take special actions for a few particular values, but for all other values take one default action.</u> Imagine we’re implementing a game (Code 6.2.6) where, if you roll a 3 on a dice roll, your player doesn’t move but instead gets a fancy new hat. If you roll a 7, your player loses a fancy hat. For all other values, your player moves that number of spaces on the game board.
+
+```rust Code 6.2.6
+fn main() {
+    let dice_roll = 9;
+    match dice_roll {
+        3 => add_fancy_hat(),
+        7 => remove_fancy_hat(),
+        other => move_player(other),
+    }
+}
+
+fn add_fancy_hat() {}
+fn remove_fancy_hat() {}
+fn move_player(num_spaces: u8) {}
+```
+
+>For the first two arms, the patterns are the literal values `3` and `7`. For the last arm that covers every other possible value, the pattern is the variable we’ve chosen to name `other`. The code that runs for the `other` arm uses the variable by passing it to the `move_player` function.
+
+>This code compiles, even though we haven’t listed all the possible values a `u8` can have, because <u>the last pattern will match all values not specifically listed</u>. This **catch-all** pattern meets the requirement that match `must` be exhaustive. If we had put the catch-all arm earlier (before `7 => ...` and `3 => ...`), <u>the other arms would never run</u>, so Rust will warn us if we add arms after a catch-all!
+
+>Rust also has a pattern we can use when we want a catch-all <u>but don’t want to use the value</u> in the catch-all pattern: `_` is a special pattern that <u>matches any value and does not bind to that value</u>. This tells Rust we aren’t going to use the value, so <u>Rust won’t warn us about an unused variable</u>.
+
+>Let’s change the rules of the game: Now, if you roll anything other than a 3 or a 7, you must roll again.
+
+```rust Code 6.2.7
+fn main() {
+    let dice_roll = 9;
+    match dice_roll {
+        3 => add_fancy_hat(),
+        7 => remove_fancy_hat(),
+        _ => reroll(),
+    }
+}
+
+fn add_fancy_hat() {}
+fn remove_fancy_hat() {}
+fn reroll() {}
+```
+
+>This example also meets the exhaustiveness requirement because we’re explicitly ignoring all other values in the last arm; we haven’t forgotten anything.
+
+>Finally, we’ll change the rules of the game one more time so that nothing else happens on your turn if you roll anything other than a 3 or a 7. We can express that by using the <u>unit value</u>:
+
+```rust Code 6.2.8
+fn main() {
+    let dice_roll = 9;
+    match dice_roll {
+        3 => add_fancy_hat(),
+        7 => remove_fancy_hat(),
+        _ => (),
+    }
+}
+
+fn add_fancy_hat() {}
+fn remove_fancy_hat() {}
+```
+
+>Here, we’re telling Rust explicitly that <u>we aren’t going to use any other value that doesn’t match a pattern in an earlier arm, and we don’t want to run any code in this case</u>.

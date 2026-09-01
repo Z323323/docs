@@ -216,9 +216,9 @@ There is one more caveat to add. In idiomatic Rust, `unsafe` should be scoped as
  At this point, a natural question arises:
  
 - <span style={{ color: "#964B00" }}><b>Q</b>: Why is dereferencing a standard reference considered safe, while dereferencing a raw pointer is considered dangerous?</span><br />
-- <span style={{ color: "#008080" }}><b>A</b>: The answer primarily lies in the different <u>operations</u> permitted on a raw pointer versus a standard reference. As we are going to see in `#6`, and as clearly demonstrated in Code 4.2.1, <u>you can perform pointer arithmetic on a raw pointer</u>. <u>When you subsequently dereference that shifted pointer, you can access memory areas that might be completely unallocated or belong to entirely different variables. If not handled with extreme care, this capability can trigger severe vulnerabilities and undefined behavior—things Rust traditionally works very hard to prevent.</u></span><br />
+- <span style={{ color: "#008080" }}><b>A</b>: The answer primarily lies in the different <u>operations</u> permitted on a raw pointer versus a standard reference. As we are going to see in `#6`, and as clearly demonstrated in Code 4.2.1, <u>you can perform pointer arithmetic on a raw pointer</u>. <u>When you subsequently dereference that shifted pointer, you can access memory areas that might be completely unallocated or belong to entirely different variables. If not handled with extreme care, this capability can trigger severe vulnerabilities and undefined behavior—things Rust traditionally works very hard to prevent.</u></span><br /><br />
 
-  <span style={{ color: "#008080" }}>Despite these risks, Rust provides the `unsafe` keyword to guarantee maximum flexibility for low-level scenarios that require it, trusting the programmer only when they are absolutely certain of what they are doing.</span><br />
+  <span style={{ color: "#008080" }}>Despite these risks, Rust provides the `unsafe` keyword to guarantee maximum flexibility for low-level scenarios that require it, trusting the programmer only when they are absolutely certain of what they are doing.</span><br /><br />
 
   <span style={{ color: "#008080" }}>The story is completely different for standard references created with the `&` operator. First and foremost, <u>you cannot perform pointer arithmetic on a standard reference</u>! <u>This single restriction prevents you from accessing memory outside the strict control of the compiler.</u> Because you cannot mathematically alter the address, it logically follows that:</span><br />
 
@@ -864,7 +864,7 @@ fn main() {
 Returning to our earlier point—and the fact that whether the active reference is mutable or immutable does not change how these errors are triggered in any way—let's take a look at Code 4.2.11.
 
 <CodeGroup>
-```rust Code 4.2.10
+```rust Code 4.2.11
 fn mutate_array(a: &mut u8) {
     *a = 0;
 }
@@ -882,7 +882,7 @@ fn main() {
 
 }
 ```
-```text C-Output 4.2.10
+```text C-Output 4.2.11
    Compiling ch_4_lab v0.1.0 (/var/home/z561/rust_projects/ch_4_lab)
 error[E0506]: cannot assign to `a[_]` because it is borrowed
    --> src/main.rs:179:5
@@ -911,14 +911,14 @@ error: could not compile `ch_4_lab` (bin "ch_4_lab") due to 1 previous error; 1 
 ```
 </CodeGroup>
 
-Code 4.2.10 also proves that <u>the compiler does not care whether a specific piece of data was actually modified</u>. In fact, <u>the specific data pointed to by `mut_ref` is completely unaffected by the `a[2] = 0` assignment</u>. The compiler only cares about the sequence of events: <u>we attempted to modify the data structure a AFTER defining a pointer to it, and then subsequently tried to access the data through that initial pointer (`mut_ref`)</u>. Furthermore, the fact that `println!` is used to access `mut_ref` is irrelevant. <u>Any method of accessing that data would trigger the exact same error.</u>
+Code 4.2.11 also proves that <u>the compiler does not care whether a specific piece of data was actually modified</u>. In fact, <u>the specific data pointed to by `mut_ref` is completely unaffected by the `a[2] = 0` assignment</u>. The compiler only cares about the sequence of events: <u>we attempted to modify the data structure a AFTER defining a pointer to it, and then subsequently tried to access the data through that initial pointer (`mut_ref`)</u>. Furthermore, the fact that `println!` is used to access `mut_ref` is irrelevant. <u>Any method of accessing that data would trigger the exact same error.</u>
 
 Once again, <u>the solution to this problem is the complete removal of the lingering reference that remains active within the `main` function's scope</u>.
 
-You might also wonder about the reference variable a defined within the internal scope of the `mutate_array` function. Because it is defined inside the scope of `mutate_array`, it is destroyed (dropped) as soon as that scope ends, as we saw in section 3.2. Consequently, it does not pose a problem, and the code will compile and execute perfectly, as demonstrated by E-Output 4.2.11.
+You might also wonder about the reference variable a defined within the internal scope of the `mutate_array` function. Because it is defined inside the scope of `mutate_array`, it is destroyed (dropped) as soon as that scope ends, as we saw in section 3.2. Consequently, it does not pose a problem, and the code will compile and execute perfectly, as demonstrated by E-Output 4.2.12.
 
 <CodeGroup>
-```rust Code 4.2.11
+```rust Code 4.2.12
 fn mutate_array(a: &mut u8) {
     *a = 0;
 }
@@ -934,7 +934,7 @@ fn main() {
 
 }
 ```
-```text C-Output 4.2.11
+```text E-Output 4.2.12
    Compiling ch_4_lab v0.1.0 (/var/home/z561/rust_projects/ch_4_lab)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s
      Running `target/debug/ch_4_lab`

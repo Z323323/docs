@@ -95,8 +95,7 @@
               "chapters/ch-7/packages-and-crates",
               "chapters/ch-7/modules",
               "chapters/ch-7/module-tree",
-              "chapters/ch-7/use-keyword",
-              "chapters/ch-7/separating-modules"
+              "chapters/ch-7/use-keyword"
             ]
           },
           {

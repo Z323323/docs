@@ -17,7 +17,7 @@ This section has been explicitly <span style={{ color: "#009B77" }}>expanded</sp
 >   </div>
 
 <Callout icon="key" color="#12A0D7" iconType="regular">
-**The Stack and the Heap**
+## The Stack and the Heap
 
 >In a systems programming language like Rust, whether a value is on the stack or the heap affects how the language behaves and why you have to make certain decisions.
 
@@ -41,7 +41,7 @@ This section has been explicitly <span style={{ color: "#009B77" }}>expanded</sp
 >   <div style={{ display: 'flex', marginTop: '0.5rem', color: '#009B77' }}>
 >     <span>↘</span>
 >     <div>
->      <p>Remember, main memory access (I/O) operations are slower than the processor's calculation speed—often taking up to 100 to 300 times longer than a single CPU cycle. If the data the CPU needs to process is grouped in contiguous memory chunks (as it is on the stack), the hardware's prefetcher can efficiently load this data into the extremely fast cache memories (L1, L2, and L3). This guarantees a massive performance boost, making data retrieval roughly 10 to 100 times faster by completely bypassing the RAM. To give you an idea of how critical this optimization is, consider that L1 caches are physically etched directly onto the silicon die, often positioned just fractions of a millimeter away from the execution cores and that the caches themselves must be physically tiny; an L1 cache block typically occupies a mere 0.1 to 0.2 square millimeters (mm²) of silicon, while a larger shared L3 cache spans roughly 15 to 20 mm². By contrast, RAM is located centimeters away on the motherboard, measuring roughly 13 by 3 centimeters. Because memory access speed is bound by (1) the overhead of loading values into CPU registers and (2) the physical speed of electrical signals, processors lose their performance advantage if they must constantly jump around RAM. Gathering scattered data in a semi-random fashion creates a severe bottleneck—and this is in general what happens with data allocated on the heap.</p>
+>      <p>Remember, main memory (RAM) access operations are slower than the processor's calculation speed—often taking up to 100 to 300 times longer than a single CPU cycle. If the data the CPU needs to process is grouped in contiguous memory chunks (as it is on the stack), the hardware's prefetcher can efficiently load this data into the extremely fast cache memories (L1, L2, and L3). This guarantees a massive performance boost, making data retrieval roughly 10 to 100 times faster by completely bypassing the RAM. To give you an idea of how critical this optimization is, consider that L1 caches are physically etched directly onto the silicon die, often positioned just fractions of a millimeter away from the execution cores and that the caches themselves must be physically tiny; an L1 cache block typically occupies a mere 0.1 to 0.2 square millimeters (mm²) of silicon, while a larger shared L3 cache spans roughly 15 to 20 mm². By contrast, RAM is located centimeters away on the motherboard, measuring roughly 13 by 3 centimeters. Because memory access speed is bound by (1) the overhead of loading values into CPU registers and (2) the physical speed of electrical signals inside semi-gated circuits, processors lose their performance advantage if they must constantly jump around RAM. Gathering scattered data creates a severe bottleneck—and this is in general what happens with data allocated on the heap mainly because of the bytes length of such allocations. Nevertheless, the underlying reality is nuanced, and it is not always true that operations on heap-allocated data are significantly slower than those on stack-allocated data. While this is generally a good rule of thumb, every scenario requires deeper analysis, taking into account the number of data structures being processed, their overall size and the frequency of the operations.</p>
 >     <div style={{ display: 'flex', color: '#009B77', marginTop: '-1.25rem', marginLeft: '-0.75rem' }}>
 >       <span>↗</span>
 >     </div>
@@ -147,7 +147,7 @@ One might therefore wonder why the compiler's behavior differs between types tha
      let s2 = &s1; /* The address of 's1' is
      COPIED into 's2'. However, 's1' 
      maintains full ownership of the 'hello'
-     string on the heap, as well as its own
+     string on the heap and its own
      metadata on the stack. */
     
      {
@@ -197,20 +197,56 @@ One might therefore wonder why the compiler's behavior differs between types tha
 
 These recent examples might cause some confusion. If so, it is highly recommended to review the concepts from section 3.2 and carefully compare them with this section to clear up any doubts. Although these scenarios would cause complex runtime errors in other languages, the Rust compiler is specifically designed to catch and flag them before deployment—right at compile time. In fact, <u>compiler errors should never be viewed as flaws in the language, but rather as its greatest strength</u>. They force you to resolve complex issues at the right moment, preventing catastrophic bugs in production!
 
-The language itself makes it difficult for these issues to occur in the first place. For instance, once you understand Code 4.4.1, preventing the issue is simple: <u>just remember not to return a reference to a variable created in an inner scope back to the outer scope (functions follow this exact same logic, as seen in section 3.2)</u>. Similarly, preventing the error in Code 4.4.2 is simply a matter of remembering <u>not to move types that do not implement the `Copy` trait into an inner scope</u>. <u>The resolution strategies observed in section 3.2 should never be forgotten</u>; they are excellent programming patterns for avoiding complex errors like these.
+The language itself makes it difficult for these issues to occur in the first place. For instance, once you understand Code 4.1.1, preventing the issue is simple: <u>just remember not to return a reference to a variable created in an inner scope back to the outer scope (functions follow this exact same logic, as seen in section 3.2)</u>. Similarly, preventing the error in Code 4.1.2 is simply a matter of remembering <u>not to move types that do not implement the `Copy` trait into an inner scope</u>. <u>The resolution strategies observed in section 3.2 should never be forgotten</u>; they are excellent programming patterns for avoiding complex errors like these.
 
 In fact, a standard programming pattern in Rust is to <u>define your core, non-temporary variables</u> (your main application state) <u>within the `main` function</u>, often <u>instantiating them from specific imported modules</u>. <u>If these variables need to be modified, you do so by passing them to functions. Within those function scopes, local variables (parameters) temporarily borrow the original data to read or mutate it safely.</u>
 
-Regarding Code 4.4.1, a beginner might mistakenly assume that avoiding returning references from an inner scope is the ultimate solution. As we will see later, however, <u>returning references from inner scopes is entirely possible</u>! To allow this, Rust simply requires additional information to guarantee that the reference will not point to data that gets dropped at the end of the inner scope—or anytime before the reference's final use in the outer scope. Specifically, this information (which introduces the concept of **lifetimes**) is tied directly to function constructs rather than raw scopes. This makes sense because, as noted in section 3.2, <u>you will never use raw scopes instead of functions, except for the rapid deallocation of temporary variables</u>.
+Regarding Code 4.1.1, a beginner might mistakenly assume that avoiding returning references from an inner scope is the ultimate solution. As we will see later, however, <u>returning references from inner scopes is entirely possible</u>! To allow this, Rust simply requires additional information to guarantee that the reference will not point to data that gets dropped at the end of the inner scope—or anytime before the reference's binding in the inner scope. Specifically, this information (which introduces the concept of **lifetimes**) is tied directly to function constructs rather than raw scopes. This makes sense because, as noted in section 3.2, <u>you will never use raw scopes instead of functions, except for the rapid deallocation of temporary variables</u>.
+
+Despite this, it is also possible to return references from a bare scope. However, the rules governing this specific use case differ from those applied to functions. In fact, a bare scope can be thought of as the normal flow of instructions—as if the program didn't explicitly use one—with the only difference being the subsequent deallocation of memory allocated within it at its end. The compiler's rules follow this exact logic, meaning it will not be necessary to specify any explicit lifetimes.
+
+Code 4.1.3 and E-Output 4.1.3 demonstrate how it is possible to return a reference from an inner scope. You do not need to fully understand the syntax just yet; the key takeaway is that the expression `(heap_ptr as *const u8).add(2)` returns a reference (a memory address pointing to the character `1` on the heap). This works perfectly because the variable `s` outlives the inner scope, ensuring its data remains alive and valid.
+
+<CodeGroup>
+```rust Code 4.1.3
+fn main() {
+    let s = String::from("561");
+    
+    let addr_of_one = {
+        let fat_ptr = &s as *const String as *const usize;
+        let heap_ptr = unsafe { *(fat_ptr.add(1)) };
+        
+        // println!("0x{:016x}", heap_ptr);
+        
+        unsafe { (heap_ptr as *const u8).add(2) }
+        
+        /* We are returning a reference pointing to data that will not be 
+           deallocated once this scope ends. This works because 's' is 
+           defined in the outer scope and is not moved (the reference 
+           itself is simply copied)! */
+    };
+    
+    let one = unsafe { *addr_of_one };
+    
+    println!("Z56{}", one as char);
+}
+```
+```text E-Output 4.1.3
+   Compiling ch_4_lab v0.1.0 (/var/home/z561/rust_projects/ch_4_lab)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.06s
+     Running `target/debug/ch_4_lab`
+Z561
+```
+</CodeGroup>
 
 ### Transferring the Reasoning to Function Scopes
 
-For the sake of completeness, and to return to our discussion on functions, we will examine two more examples (Code 4.1.3 and Code 4.1.4). Just as in section 3.2, these will replicate the issues seen in the earlier examples (Code 4.1.1 and Code 4.1.2), but this time through the use of function calls. Unlike in Code 4.1.2, where `s1` is directly accessed from within an inner block, in Code 4.1.4 we must explicitly pass `s1` as an argument to `takes_ownership_and_drop` because function scopes cannot see variables defined in the outer scope.
+For the sake of completeness, and to return to our discussion on functions, we will examine two more examples (Code 4.1.4 and Code 4.1.5). Just as in section 3.2, these will replicate the issues seen in the earlier examples (Code 4.1.1 and Code 4.1.2), but this time through the use of function calls. Unlike in Code 4.1.2, where `s1` is directly accessed from within an inner block, in Code 4.1.5 we must explicitly pass `s1` as an argument to `takes_ownership_and_drop` because function scopes cannot see variables defined in the outer scope.
 
 <Columns>
  <Column>
  <CodeGroup>
- ```rust Code 4.1.3
+ ```rust Code 4.1.4
  fn ret_dangling_pointer() -> &u8 {
      let x: u8 = 17;
      &x
@@ -220,7 +256,7 @@ For the sake of completeness, and to return to our discussion on functions, we w
      let y = ret_dangling_pointer();
  }
  ```
- ```text C-Output 4.1.3
+ ```text C-Output 4.1.4
     Compiling ch_4_lab v0.1.0 (/var/home/z561/rust_projects/ch_4_lab)
  error[E0106]: missing lifetime specifier
   --> src/main.rs:1:30
@@ -235,7 +271,7 @@ For the sake of completeness, and to return to our discussion on functions, we w
  </Column>
  <Column>
  <CodeGroup>
- ```rust Code 4.1.4
+ ```rust Code 4.1.5
  fn takes_ownership_and_drop(_s: String) {
      // Yes, nothing.
  }
@@ -246,7 +282,7 @@ For the sake of completeness, and to return to our discussion on functions, we w
      let s2 = &s1; /* The address of 's1' is
      COPIED into 's2'. However, 's1'
      maintains full ownership of the 'hello'
-     string on the heap, as well as its own
+     string on the heap and its own
      metadata on the stack. */
  
      takes_ownership_and_drop(s1);
@@ -256,7 +292,7 @@ For the sake of completeness, and to return to our discussion on functions, we w
      the use of the dangling pointer. */
  }
  ```
- ```text C-Output 4.1.4
+ ```text C-Output 4.1.5
     Compiling ch_4_lab v0.1.0 (/var/home/z561/rust_projects/ch_4_lab)
  error[E0505]: cannot move out of `s1` because it is borrowed
    --> src/main.rs:25:30
@@ -282,7 +318,7 @@ For the sake of completeness, and to return to our discussion on functions, we w
  </Column>
 </Columns>
 
-Observing C-Output 4.1.4, one can note how this is practically equivalent to C-Output 4.1.2. This does not happen, however, regarding Code 4.1.3; that is, its C-Output 4.1.3 is different compared to that of Code 4.1.1. This happens for the reason explained shortly ago: Rust tries to allow the return of references from functions through a careful use of the functionalities offered by <u>lifetimes</u>. At the same time, however, the compiler reports: `this function's return type contains a borrowed value, but there is no value for it to be borrowed from`. This note is quite unclear, but it indicates that even though we are trying to return a reference, at the end of the function's scope, such a reference no longer exists because it has been dropped. This means that the compiler does not find any value to return through the `&x` reference.
+Observing C-Output 4.1.5, one can note how this is practically equivalent to C-Output 4.1.2. This does not happen, however, regarding Code 4.1.4; that is, its C-Output 4.1.4 is different compared to that of Code 4.1.1. This happens for the reason explained shortly ago: Rust tries to allow the return of references from functions through a careful use of the functionalities offered by <u>lifetimes</u>. At the same time, however, the compiler reports: `this function's return type contains a borrowed value, but there is no value for it to be borrowed from`. This note is quite unclear, but it indicates that even though we are trying to return a reference, at the end of the function's scope, such a reference no longer exists because it has been dropped. This means that the compiler does not find any value to return through the `&x` reference.
 
 ### Clarifying the 'Borrowing' Terminology
 
